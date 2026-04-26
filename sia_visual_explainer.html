@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="te">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIA — Visual Explainer</title>
+<link href="https://fonts.googleapis.com/css2?family=Tiro+Telugu&family=Fredoka+One&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#07050F;--card:#0F0D1A;--border:#1E1A2E;
+  --gold:#FFD700;--fire:#FF6B35;--cyan:#00FFD4;
+  --green:#00FF88;--pink:#FF2D7A;--purple:#9D4EDD;
+  --text:#F0EAF8;--muted:#6A5A8A;
+}
+body{background:var(--bg);color:var(--text);font-family:'Space Mono',monospace;min-height:100vh;overflow-x:hidden;}
+
+/* ── Header ── */
+.header{text-align:center;padding:2rem 1rem 1rem;}
+.header-title{font-family:'Tiro Telugu',serif;font-size:2.5rem;background:linear-gradient(135deg,var(--fire),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:4px;}
+.header-sub{color:var(--muted);font-size:.65rem;letter-spacing:3px;text-transform:uppercase;margin-top:4px;}
+
+/* ── Input panel ── */
+.input-panel{max-width:700px;margin:1.5rem auto;padding:0 1rem;}
+.question-box{
+  width:100%;padding:1rem 1.2rem;
+  background:var(--card);border:1px solid var(--border);
+  border-radius:12px;color:var(--text);
+  font-family:'Space Mono',monospace;font-size:.85rem;
+  resize:none;outline:none;min-height:80px;
+  transition:border-color .2s;
+}
+.question-box:focus{border-color:var(--fire);}
+.question-box::placeholder{color:var(--muted);}
+
+.btn-row{display:flex;gap:.6rem;margin-top:.8rem;flex-wrap:wrap;}
+.ask-btn{
+  flex:1;padding:.8rem;border:none;border-radius:10px;
+  font-family:'Space Mono',monospace;font-size:.7rem;
+  letter-spacing:2px;text-transform:uppercase;
+  cursor:pointer;transition:all .2s;font-weight:700;
+}
+.ask-btn.primary{background:linear-gradient(135deg,var(--fire),#aa3300);color:white;}
+.ask-btn.secondary{background:var(--card);border:1px solid var(--border);color:var(--muted);}
+.ask-btn:hover{transform:scale(1.03);box-shadow:0 4px 20px #FF6B3544;}
+
+/* ── Topic chips ── */
+.chips{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.8rem;justify-content:center;}
+.chip{
+  padding:5px 14px;border-radius:20px;font-size:.6rem;
+  letter-spacing:1px;cursor:pointer;border:1px solid var(--border);
+  color:var(--muted);background:var(--card);transition:all .2s;
+  font-family:'Space Mono',monospace;
+}
+.chip:hover{border-color:var(--fire);color:var(--gold);}
+
+/* ── Stage ── */
+.stage{
+  max-width:700px;margin:1.5rem auto;padding:0 1rem;
+  display:none;
+}
+.stage.visible{display:block;}
+
+.stage-header{
+  display:flex;align-items:center;gap:.8rem;
+  margin-bottom:1rem;
+}
+.stage-type{
+  padding:4px 14px;border-radius:20px;font-size:.6rem;
+  letter-spacing:2px;text-transform:uppercase;font-weight:700;
+}
+.type-kids{background:#1A3A1A;border:1px solid var(--green);color:var(--green);}
+.type-science{background:#0A1A2A;border:1px solid var(--cyan);color:var(--cyan);}
+.type-math{background:#1A0A2A;border:1px solid var(--purple);color:var(--purple);}
+.type-general{background:#2A1A0A;border:1px solid var(--gold);color:var(--gold);}
+
+.stage-title{font-family:'Fredoka One',cursive;font-size:1.1rem;color:var(--text);}
+
+/* ── Canvas wrapper ── */
+.canvas-wrap{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:16px;overflow:hidden;position:relative;
+}
+canvas.anim{display:block;width:100%;}
+
+/* ── Explanation cards ── */
+.explain-steps{margin-top:1rem;display:flex;flex-direction:column;gap:.6rem;}
+.step-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:12px;padding:.9rem 1rem;
+  display:flex;gap:.8rem;align-items:flex-start;
+  animation:slideIn .4s ease-out forwards;
+  opacity:0;
+}
+@keyframes slideIn{from{opacity:0;transform:translateX(-20px);}to{opacity:1;transform:translateX(0);}}
+.step-num{
+  min-width:28px;height:28px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:.7rem;font-weight:700;flex-shrink:0;
+}
+.step-text{font-size:.78rem;line-height:1.6;color:var(--text);}
+.step-text .tel{font-family:'Tiro Telugu',serif;font-size:.85rem;color:var(--gold);}
+
+/* ── Loading ── */
+.loading{
+  text-align:center;padding:3rem;
+  color:var(--muted);font-size:.7rem;letter-spacing:2px;
+  display:none;
+}
+.loading.visible{display:block;}
+.dot-anim span{animation:dotBlink 1.4s infinite;display:inline-block;}
+.dot-anim span:nth-child(2){animation-delay:.2s;}
+.dot-anim span:nth-child(3){animation-delay:.4s;}
+@keyframes dotBlink{0%,80%,100%{opacity:0;}40%{opacity:1;}}
+
+hr.divider{border:none;border-top:1px solid var(--border);margin:1.5rem 0;}
+
+/* ── Controls ── */
+.anim-controls{
+  display:flex;gap:.5rem;padding:.6rem;
+  background:#080614;border-top:1px solid var(--border);
+}
+.ctrl{background:transparent;border:1px solid var(--border);color:var(--muted);
+      padding:5px 12px;border-radius:6px;font-size:.6rem;cursor:pointer;
+      font-family:'Space Mono',monospace;letter-spacing:1px;transition:all .2s;}
+.ctrl:hover{border-color:var(--fire);color:var(--gold);}
+.ctrl.active{border-color:var(--fire);color:var(--fire);}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-title">🕉 SIA లెర్న్</div>
+  <div class="header-sub">Visual · Animated · Telugu Explainer</div>
+</div>
+
+<div class="input-panel">
+  <textarea class="question-box" id="qbox"
+    placeholder="ఇక్కడ మీ question type చేయండి...&#10;&#10;Examples:&#10;• Water cycle అంటే ఏమిటి?&#10;• H2O + HCl reaction చూపించు&#10;• 2x + 5 = 11 solve చేయి&#10;• Photosynthesis explain చేయి"></textarea>
+
+  <div class="btn-row">
+    <button class="ask-btn primary" onclick="explain()">▶ Animate చేయి</button>
+    <button class="ask-btn secondary" onclick="clearAll()">✕ Clear</button>
+  </div>
+
+  <div class="chips">
+    <div class="chip" onclick="setQ('Water cycle అంటే ఏమిటి?')">💧 Water Cycle</div>
+    <div class="chip" onclick="setQ('Photosynthesis process explain చేయి')">🌿 Photosynthesis</div>
+    <div class="chip" onclick="setQ('2x + 5 = 11 solve చేయి')">🔢 Algebra</div>
+    <div class="chip" onclick="setQ('H2O molecule structure చూపించు')">⚗️ H2O</div>
+    <div class="chip" onclick="setQ('Solar system planets explain చేయి')">🪐 Solar System</div>
+    <div class="chip" onclick="setQ('Pythagoras theorem visually చూపించు')">📐 Pythagoras</div>
+    <div class="chip" onclick="setQ('DNA structure అంటే ఏమిటి?')">🧬 DNA</div>
+    <div class="chip" onclick="setQ('Rainbow ఎందుకు వస్తుంది?')">🌈 Rainbow</div>
+    <div class="chip" onclick="setQ('Fractions 1/2 + 1/3 visually చూపించు')">🍕 Fractions</div>
+    <div class="chip" onclick="setQ('Heart how it pumps blood')">❤️ Heart</div>
+  </div>
+</div>
+
+<div class="loading" id="loading">
+  <div class="dot-anim">
+    SIA ఆలోచిస్తోంది<span>.</span><span>.</span><span>.</span>
+  </div>
+</div>
+
+<div class="stage" id="stage">
+  <div class="stage-header">
+    <div class="stage-type" id="stage-type-badge">TYPE</div>
+    <div class="stage-title" id="stage-title">Title</div>
+  </div>
+
+  <div class="canvas-wrap">
+    <canvas class="anim" id="anim-canvas" height="340"></canvas>
+    <div class="anim-controls">
+      <button class="ctrl active" id="btn-play" onclick="togglePlay()">⏸ Pause</button>
+      <button class="ctrl" onclick="restartAnim()">↺ Restart</button>
+      <button class="ctrl" id="btn-speed" onclick="toggleSpeed()">⚡ 1x</button>
+    </div>
+  </div>
+
+  <div class="explain-steps" id="steps"></div>
+</div>
+
+<script>
+// ══════════════════════════════════
+//  STATE
+// ══════════════════════════════════
+const cv    = document.getElementById('anim-canvas');
+const ctx   = cv.getContext('2d');
+let W, H;
+let animId  = null;
+let frame   = 0;
+let playing = true;
+let speed   = 1;
+let currentType = 'general';
+
+function resize(){
+  W = cv.width  = cv.offsetWidth;
+  H = cv.height = 340;
+}
+
+function setQ(q){ document.getElementById('qbox').value = q; }
+
+function clearAll(){
+  document.getElementById('qbox').value='';
+  document.getElementById('stage').classList.remove('visible');
+  document.getElementById('loading').classList.remove('visible');
+  cancelAnimationFrame(animId);
+}
+
+function togglePlay(){
+  playing=!playing;
+  document.getElementById('btn-play').textContent=playing?'⏸ Pause':'▶ Play';
+  document.getElementById('btn-play').classList.toggle('active',playing);
+  if(playing) runCurrentAnim();
+}
+
+function toggleSpeed(){
+  speed = speed===1?2:speed===2?.5:1;
+  document.getElementById('btn-speed').textContent=`⚡ ${speed}x`;
+}
+
+function restartAnim(){ frame=0; if(!playing){playing=true;document.getElementById('btn-play').textContent='⏸ Pause';} }
+
+// ══════════════════════════════════
+//  DETECT QUESTION TYPE
+// ══════════════════════════════════
+function detectType(q){
+  const ql=q.toLowerCase();
+  if(/\d.*[+\-*/=x]|solve|equation|algebra|fraction|geometry|pythagoras|area|volume|angle|triangle|circle|math|matrix|calculus/.test(ql)) return 'math';
+  if(/reaction|molecule|atom|chemical|acid|base|ph|h2o|co2|dna|cell|photosynthesis|osmosis|enzyme|protein|chromosome|element|periodic|bond|electron/.test(ql)) return 'science';
+  if(/kids|child|story|animal|planet|rainbow|cloud|rain|sun|water cycle|heart|butterfly|seed|grow|simple|easy|what is|why does|how does/.test(ql)) return 'kids';
+  return 'general';
+}
+
+// ══════════════════════════════════
+//  MAIN EXPLAIN FUNCTION
+// ══════════════════════════════════
+async function explain(){
+  const q = document.getElementById('qbox').value.trim();
+  if(!q) return;
+
+  const type = detectType(q);
+  currentType = type;
+
+  document.getElementById('loading').classList.add('visible');
+  document.getElementById('stage').classList.remove('visible');
+  document.getElementById('steps').innerHTML='';
+  cancelAnimationFrame(animId);
+  frame=0; playing=true;
+
+  // Set badge
+  const badge = document.getElementById('stage-type-badge');
+  const badgeMap = {kids:'type-kids',science:'type-science',math:'type-math',general:'type-general'};
+  const labelMap = {kids:'🎈 Kids Mode',science:'⚗️ Science',math:'📐 Math',general:'💡 General'};
+  badge.className='stage-type '+badgeMap[type];
+  badge.textContent=labelMap[type];
+
+  // Detect specific animation
+  const anim = detectAnimation(q, type);
+  document.getElementById('stage-title').textContent = anim.title;
+
+  // Build explanation steps
+  const steps = buildSteps(q, type, anim);
+
+  document.getElementById('loading').classList.remove('visible');
+  document.getElementById('stage').classList.add('visible');
+  resize();
+
+  // Show steps with delay
+  const stepsEl = document.getElementById('steps');
+  steps.forEach((s,i)=>{
+    setTimeout(()=>{
+      const col = {kids:'#00FF88',science:'#00FFD4',math:'#9D4EDD',general:'#FFD700'}[type];
+      stepsEl.innerHTML += `
+        <div class="step-card" style="animation-delay:${i*.1}s;border-color:${col}22">
+          <div class="step-num" style="background:${col}22;color:${col}">${i+1}</div>
+          <div class="step-text">${s}</div>
+        </div>`;
+    }, i*200);
+  });
+
+  // Run animation
+  runAnimation(anim, type);
+}
+
+// ══════════════════════════════════
+//  DETECT WHICH ANIMATION TO SHOW
+// ══════════════════════════════════
+function detectAnimation(q, type){
+  const ql = q.toLowerCase();
+
+  if(/water.?cycle|rain|cloud/.test(ql))     return {id:'watercycle', title:'Water Cycle 💧'};
+  if(/photosynthesis|sunlight.*plant/.test(ql)) return {id:'photosynthesis', title:'Photosynthesis 🌿'};
+  if(/solar.?system|planet/.test(ql))        return {id:'solar', title:'Solar System 🪐'};
+  if(/rainbow/.test(ql))                     return {id:'rainbow', title:'Rainbow 🌈'};
+  if(/heart|blood.?pump/.test(ql))           return {id:'heart', title:'Heart Beat ❤️'};
+  if(/dna|double helix/.test(ql))            return {id:'dna', title:'DNA Structure 🧬'};
+  if(/h2o|water.?molecule/.test(ql))         return {id:'h2o', title:'H₂O Molecule ⚗️'};
+  if(/pythagoras/.test(ql))                  return {id:'pythagoras', title:'Pythagoras Theorem 📐'};
+  if(/fraction/.test(ql))                    return {id:'fractions', title:'Fractions 🍕'};
+  if(/algebra|solve.*=|equation/.test(ql))   return {id:'algebra', title:'Algebra Solver 🔢'};
+  if(/circle|circumference|pi/.test(ql))     return {id:'circle', title:'Circle & Pi 🔵'};
+
+  // default by type
+  if(type==='kids')    return {id:'watercycle', title:'Let me show you! 🎈'};
+  if(type==='science') return {id:'dna',        title:'Science Animation ⚗️'};
+  if(type==='math')    return {id:'pythagoras', title:'Math Visualizer 📐'};
+  return {id:'general', title:'Visual Explanation 💡'};
+}
+
+// ══════════════════════════════════
+//  BUILD STEP EXPLANATIONS
+// ══════════════════════════════════
+function buildSteps(q, type, anim){
+  const steps = {
+    watercycle:[
+      '<span class="tel">సముద్రం</span> నుండి నీళ్ళు ఆవిరి అవుతాయి — Evaporation',
+      'ఆవిరి పైకి వెళ్ళి <span class="tel">మేఘాలు</span> అవుతాయి — Condensation',
+      'మేఘాలు నిండి <span class="tel">వర్షం</span> కురుస్తుంది — Precipitation',
+      'నీళ్ళు తిరిగి సముద్రానికి వెళ్తాయి — Runoff ♻️'
+    ],
+    photosynthesis:[
+      '🌞 <span class="tel">సూర్యకాంతి</span> ఆకులకు తగులుతుంది — Sunlight absorbed',
+      '💧 వేర్లు నుండి <span class="tel">నీళ్ళు</span> ఆకులకు వస్తాయి — Water uptake',
+      '🌬️ <span class="tel">గాలి</span> నుండి CO₂ తీసుకుంటుంది — CO₂ intake',
+      '🍬 Chlorophyll కాంతిని <span class="tel">శక్తిగా</span> మారుస్తుంది — Glucose made',
+      '💨 O₂ బయటకు వస్తుంది — Oxygen released! 🌿'
+    ],
+    solar:[
+      '☀️ <span class="tel">సూర్యుడు</span> మధ్యలో ఉంటాడు — Sun at center',
+      '🌍 భూమి 365 రోజులలో సూర్యుని చుట్టూ తిరుగుతుంది',
+      '🌙 చంద్రుడు భూమి చుట్టూ 28 రోజులకు తిరుగుతాడు',
+      '🪐 Saturn కి rings ఉంటాయి — ice and rock particles',
+      '🔭 8 planets ఉన్నాయి — Mercury నుండి Neptune వరకు'
+    ],
+    dna:[
+      '🧬 DNA అంటే Deoxyribonucleic Acid',
+      'రెండు <span class="tel">తీగలు</span> spiral గా చుట్టుకుంటాయి — Double Helix',
+      'A-T మరియు G-C <span class="tel">జతలు</span> అవుతాయి — Base Pairs',
+      'DNA లో మన <span class="tel">జీవ సమాచారం</span> అంతా ఉంటుంది — Genetic Code',
+      'Human DNA = 3 billion base pairs! 🤯'
+    ],
+    h2o:[
+      '💧 H₂O = 2 Hydrogen + 1 Oxygen atoms',
+      '<span class="tel">Oxygen పెద్దదిగా</span> మధ్యలో ఉంటుంది',
+      'రెండు Hydrogen atoms 104.5° angle లో ఉంటాయి',
+      'Covalent bonds hydrogen మరియు oxygen ని కలుపుతాయి',
+      'Polar molecule కావడం వల్ల నీళ్ళు <span class="tel">అన్నింటినీ కరిగిస్తాయి</span>!'
+    ],
+    pythagoras:[
+      '📐 Right triangle లో: a² + b² = c²',
+      'c = hypotenuse (longest side) <span class="tel">అతి పెద్ద భుజం</span>',
+      'Example: 3² + 4² = 9 + 16 = 25 = 5²',
+      'కాబట్టి sides 3, 4, 5 అయితే right triangle!',
+      '🏛️ Pythagoras 2500 సంవత్సరాల క్రితం కనుగొన్నాడు'
+    ],
+    algebra:[
+      '🔢 2x + 5 = 11 — x విలువ కనుగొనాలి',
+      'Step 1: రెండు వైపుల నుండి 5 తీయండి → 2x = 6',
+      'Step 2: రెండు వైపులను 2 తో భాగించండి → x = 3',
+      'Check: 2(3) + 5 = 6 + 5 = 11 ✅ <span class="tel">సరైంది!</span>',
+      '💡 Balance method — ఒక వైపు చేస్తే రెండవ వైపు కూడా చేయాలి'
+    ],
+    fractions:[
+      '🍕 Fraction అంటే <span class="tel">భాగం</span>',
+      '1/2 అంటే pizza ని 2 భాగాలు చేసి 1 తినడం',
+      '1/2 + 1/3 = 3/6 + 2/6 = 5/6',
+      'Common denominator కనుగొనడం key!',
+      '🎯 <span class="tel">పిజ్జా</span> తింటే fractions గుర్తుండిపోతాయి! 😄'
+    ],
+    circle:[
+      '🔵 Circle = అన్ని points center నుండి equal distance',
+      'Radius (r) = center నుండి edge వరకు',
+      'Diameter = radius × 2',
+      'Circumference = 2πr ≈ 2 × 3.14 × r',
+      'Area = πr² — <span class="tel">వృత్త వైశాల్యం</span>'
+    ],
+    heart:[
+      '❤️ Heart ప్రతి నిమిషం 60-100 సార్లు కొట్టుకుంటుంది',
+      'Right side <span class="tel">శ్వాస కొరకు</span> lungs కి blood పంపుతుంది',
+      'Left side <span class="tel">శరీరానికి</span> oxygen blood పంపుతుంది',
+      '4 chambers: 2 Atria + 2 Ventricles',
+      'మన జీవితంలో heart ~2.5 billion సార్లు కొట్టుకుంటుంది! 🤯'
+    ],
+    rainbow:[
+      '☀️ తెల్లటి <span class="tel">సూర్యకాంతి</span> లో అన్ని రంగులు ఉంటాయి',
+      '💧 వర్షపు నీటి బిందువులు prism లా పని చేస్తాయి',
+      'కాంతి refract అయి రంగులుగా విడిపోతుంది',
+      '🌈 VIBGYOR: Violet Indigo Blue Green Yellow Orange Red',
+      'Red పై ఉంటుంది, Violet కింద ఉంటుంది — <span class="tel">ఎందుకంటే?</span> Different wavelengths!'
+    ],
+    general:[
+      '💡 Question detect చేశాను',
+      'Animation ని step-by-step చూపిస్తున్నాను',
+      'ప్రతి step ని observe చేయండి',
+      'Pause చేసి details చూడవచ్చు'
+    ]
+  };
+  return steps[anim.id] || steps.general;
+}
+
+// ══════════════════════════════════
+//  ANIMATION RUNNER
+// ══════════════════════════════════
+let currentAnim = null;
+function runCurrentAnim(){ if(currentAnim) runAnimation(currentAnim, currentType); }
+
+function runAnimation(anim, type){
+  cancelAnimationFrame(animId);
+  currentAnim = anim;
+  const animFns = {
+    watercycle:  animWaterCycle,
+    photosynthesis: animPhotosynthesis,
+    solar:       animSolar,
+    rainbow:     animRainbow,
+    heart:       animHeart,
+    dna:         animDNA,
+    h2o:         animH2O,
+    pythagoras:  animPythagoras,
+    fractions:   animFractions,
+    algebra:     animAlgebra,
+    circle:      animCircle,
+    general:     animGeneral
+  };
+  const fn = animFns[anim.id] || animGeneral;
+  function loop(){
+    if(!playing){animId=requestAnimationFrame(loop);return;}
+    frame += speed;
+    fn(frame);
+    animId = requestAnimationFrame(loop);
+  }
+  loop();
+}
+
+// ══════════════════════════════════
+//  ANIMATION: WATER CYCLE
+// ══════════════════════════════════
+function animWaterCycle(f){
+  ctx.fillStyle='#050D1A';ctx.fillRect(0,0,W,H);
+  // sky gradient
+  const sky=ctx.createLinearGradient(0,0,0,H);
+  sky.addColorStop(0,'#0A1628');sky.addColorStop(.6,'#1A2840');sky.addColorStop(1,'#0A1E10');
+  ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+
+  // sun
+  const sunX=W*.85,sunY=60;
+  ctx.save();
+  ctx.shadowBlur=40;ctx.shadowColor='#FFD700';
+  ctx.fillStyle='#FFD700';ctx.beginPath();ctx.arc(sunX,sunY,30,0,Math.PI*2);ctx.fill();
+  // sun rays
+  for(let i=0;i<8;i++){
+    const a=i*Math.PI/4+f*.01;
+    ctx.strokeStyle='#FFD70066';ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(sunX+Math.cos(a)*35,sunY+Math.sin(a)*35);
+    ctx.lineTo(sunX+Math.cos(a)*55,sunY+Math.sin(a)*55);ctx.stroke();
+  }
+  ctx.restore();
+
+  // ocean
+  ctx.fillStyle='#0A2A4A';
+  ctx.fillRect(0,H*.7,W,H*.3);
+  // ocean waves
+  ctx.strokeStyle='#1A4A7A';ctx.lineWidth=2;
+  for(let wx=0;wx<W;wx+=4){
+    const wy=H*.7+Math.sin(wx*.05+f*.03)*5;
+    wx===0?ctx.beginPath():null;
+    wx===0?ctx.moveTo(wx,wy):ctx.lineTo(wx,wy);
+  }
+  ctx.stroke();
+
+  // ground
+  ctx.fillStyle='#1A3A1A';ctx.fillRect(0,H*.85,W,H*.15);
+
+  // evaporation particles
+  for(let i=0;i<15;i++){
+    const px=W*.1+i*(W*.08);
+    const py=H*.7-(((f*1.5+i*40)%200));
+    if(py>0&&py<H*.5){
+      ctx.save();
+      ctx.globalAlpha=1-(py/(H*.5));
+      ctx.fillStyle='#88CCFF';
+      ctx.beginPath();ctx.arc(px,py,3,0,Math.PI*2);ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  // label evaporation
+  ctx.fillStyle='#88CCFF88';ctx.font='12px Space Mono';
+  ctx.fillText('Evaporation ↑',W*.05,H*.5);
+
+  // clouds
+  const cx1=W*.3+(Math.sin(f*.005)*20);
+  const cx2=W*.6+(Math.cos(f*.007)*15);
+  drawCloud(ctx,cx1,H*.18,60,30,'#AACCFF');
+  drawCloud(ctx,cx2,H*.12,80,35,'#8899BB');
+
+  // rain from cloud 2
+  for(let r=0;r<8;r++){
+    const rx=cx2-30+r*9;
+    const ry=H*.22+((f*2+r*20)%120);
+    if(ry<H*.7){
+      ctx.strokeStyle='#4488FF';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.moveTo(rx,ry);ctx.lineTo(rx-3,ry+12);ctx.stroke();
+    }
+  }
+  ctx.fillStyle='#4488FF88';ctx.font='12px Space Mono';
+  ctx.fillText('Precipitation ↓',cx2-20,H*.08);
+
+  // label condensation
+  ctx.fillStyle='#AACCFF88';ctx.font='12px Space Mono';
+  ctx.fillText('Condensation',cx1-40,H*.1);
+
+  // runoff arrow
+  ctx.strokeStyle='#22AA4488';ctx.lineWidth=2;ctx.setLineDash([5,5]);
+  ctx.beginPath();ctx.moveTo(W*.7,H*.85);ctx.lineTo(W*.15,H*.82);ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='#22AA4488';ctx.font='11px Space Mono';
+  ctx.fillText('Runoff →',W*.4,H*.88);
+}
+
+function drawCloud(ctx,x,y,w,h,col){
+  ctx.save();ctx.shadowBlur=20;ctx.shadowColor=col+'88';
+  ctx.fillStyle=col;
+  ctx.beginPath();ctx.ellipse(x,y,w,h,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(x-w*.3,y+h*.2,w*.6,h*.7,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(x+w*.3,y+h*.2,w*.6,h*.7,0,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+}
+
+// ══════════════════════════════════
+//  ANIMATION: SOLAR SYSTEM
+// ══════════════════════════════════
+const PLANETS=[
+  {name:'Mercury',r:5,orb:60, speed:.047,col:'#AAA'},
+  {name:'Venus',  r:9,orb:95, speed:.035,col:'#FFAA44'},
+  {name:'Earth',  r:10,orb:135,speed:.029,col:'#4488FF'},
+  {name:'Mars',   r:7,orb:175,speed:.024,col:'#FF4422'},
+  {name:'Jupiter',r:22,orb:230,speed:.013,col:'#FFCC88'},
+  {name:'Saturn', r:18,orb:280,speed:.009,col:'#FFDD99'},
+];
+
+function animSolar(f){
+  ctx.fillStyle='#020408';ctx.fillRect(0,0,W,H);
+  // stars
+  for(let i=0;i<80;i++){
+    const sx=(i*137+50)%W,sy=(i*97+30)%H;
+    ctx.globalAlpha=.3+Math.sin(f*.05+i)*.2;
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(sx,sy,1,0,Math.PI*2);ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  const cx=W/2,cy=H/2;
+  // sun
+  ctx.save();ctx.shadowBlur=60;ctx.shadowColor='#FFD700';
+  const sg=ctx.createRadialGradient(cx,cy,0,cx,cy,30);
+  sg.addColorStop(0,'#FFFFFF');sg.addColorStop(.4,'#FFD700');sg.addColorStop(1,'#FF6600');
+  ctx.fillStyle=sg;ctx.beginPath();ctx.arc(cx,cy,28,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+
+  PLANETS.forEach(p=>{
+    // orbit ring
+    ctx.strokeStyle=p.col+'22';ctx.lineWidth=1;
+    ctx.beginPath();ctx.arc(cx,cy,p.orb,0,Math.PI*2);ctx.stroke();
+
+    const ang=f*p.speed*.05;
+    const px=cx+Math.cos(ang)*p.orb;
+    const py=cy+Math.sin(ang)*p.orb;
+
+    // planet
+    ctx.save();ctx.shadowBlur=15;ctx.shadowColor=p.col;
+    ctx.fillStyle=p.col;ctx.beginPath();ctx.arc(px,py,p.r,0,Math.PI*2);ctx.fill();
+
+    // Saturn rings
+    if(p.name==='Saturn'){
+      ctx.strokeStyle='#FFDD9966';ctx.lineWidth=3;
+      ctx.beginPath();ctx.ellipse(px,py,p.r+14,p.r*.4,ang,0,Math.PI*2);ctx.stroke();
+    }
+    // Earth moon
+    if(p.name==='Earth'){
+      const ma=ang*13;
+      const mx=px+Math.cos(ma)*18,my=py+Math.sin(ma)*18;
+      ctx.fillStyle='#AAAAAA';ctx.beginPath();ctx.arc(mx,my,3,0,Math.PI*2);ctx.fill();
+    }
+    ctx.restore();
+
+    // label
+    ctx.fillStyle=p.col+'CC';ctx.font='9px Space Mono';
+    ctx.textAlign='center';ctx.fillText(p.name,px,py-p.r-5);
+  });
+  ctx.textAlign='left';
+}
+
+// ══════════════════════════════════
+//  ANIMATION: DNA
+// ══════════════════════════════════
+function animDNA(f){
+  ctx.fillStyle='#050310';ctx.fillRect(0,0,W,H);
+  const cx=W/2;
+  const BASES=[['A','T','#FF6B35','#00FFD4'],['G','C','#FFD700','#FF2D7A'],['T','A','#00FFD4','#FF6B35'],['C','G','#FF2D7A','#FFD700']];
+
+  for(let i=0;i<16;i++){
+    const y=30+i*20;
+    const scroll=(f*.5)%20;
+    const yi=y-scroll+i%1;
+    if(yi<10||yi>H-10) continue;
+    const phase=i*.4+f*.015;
+    const x1=cx+Math.cos(phase)*100;
+    const x2=cx+Math.cos(phase+Math.PI)*100;
+
+    const base=BASES[i%4];
+    // backbone dots
+    ctx.save();ctx.shadowBlur=12;ctx.shadowColor=base[2];
+    ctx.fillStyle=base[2];ctx.beginPath();ctx.arc(x1,yi,5,0,Math.PI*2);ctx.fill();
+    ctx.shadowColor=base[3];ctx.fillStyle=base[3];
+    ctx.beginPath();ctx.arc(x2,yi,5,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+
+    // connecting rung
+    ctx.save();ctx.globalAlpha=.5;
+    ctx.strokeStyle='#ffffff22';ctx.lineWidth=1.5;ctx.setLineDash([3,3]);
+    ctx.beginPath();ctx.moveTo(x1,yi);ctx.lineTo(x2,yi);ctx.stroke();
+    ctx.setLineDash([]);
+    // base labels
+    ctx.globalAlpha=.8;ctx.font='bold 9px Space Mono';ctx.textAlign='center';
+    ctx.fillStyle=base[2];ctx.fillText(base[0],x1,yi+4);
+    ctx.fillStyle=base[3];ctx.fillText(base[1],x2,yi+4);
+    ctx.restore();
+  }
+  // spines
+  ctx.strokeStyle='#FF6B3544';ctx.lineWidth=2;
+  ctx.beginPath();
+  for(let y=0;y<H;y+=3){
+    const phase=y*.05-f*.015;
+    const x=cx+Math.cos(phase)*100;
+    y===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  ctx.strokeStyle='#00FFD444';ctx.beginPath();
+  for(let y=0;y<H;y+=3){
+    const phase=y*.05-f*.015+Math.PI;
+    const x=cx+Math.cos(phase)*100;
+    y===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  ctx.textAlign='left';
+  ctx.fillStyle='#FF6B3588';ctx.font='11px Space Mono';
+  ctx.fillText('Double Helix',cx+115,H/2);
+}
+
+// ══════════════════════════════════
+//  ANIMATION: H2O MOLECULE
+// ══════════════════════════════════
+function animH2O(f){
+  ctx.fillStyle='#030A14';ctx.fillRect(0,0,W,H);
+  const cx=W/2,cy=H/2;
+  const angle=f*.01;
+
+  // rotate whole molecule
+  ctx.save();ctx.translate(cx,cy);ctx.rotate(angle);
+
+  // bonds
+  const bondAngle=104.5*Math.PI/180/2;
+  ctx.strokeStyle='#FFFFFF44';ctx.lineWidth=4;
+  ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos(Math.PI/2+bondAngle)*70,Math.sin(Math.PI/2+bondAngle)*70);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos(Math.PI/2-bondAngle)*70,Math.sin(Math.PI/2-bondAngle)*70);ctx.stroke();
+
+  // Oxygen
+  ctx.save();ctx.shadowBlur=30;ctx.shadowColor='#FF4444';
+  const og=ctx.createRadialGradient(0,0,0,0,0,30);
+  og.addColorStop(0,'#FF8888');og.addColorStop(1,'#CC0000');
+  ctx.fillStyle=og;ctx.beginPath();ctx.arc(0,0,30,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='white';ctx.font='bold 16px Space Mono';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText('O',0,0);ctx.restore();
+
+  // Hydrogens
+  const h1x=Math.cos(Math.PI/2+bondAngle)*70,h1y=Math.sin(Math.PI/2+bondAngle)*70;
+  const h2x=Math.cos(Math.PI/2-bondAngle)*70,h2y=Math.sin(Math.PI/2-bondAngle)*70;
+  [[h1x,h1y],[h2x,h2y]].forEach(([hx,hy])=>{
+    ctx.save();ctx.shadowBlur=20;ctx.shadowColor='#4488FF';
+    const hg=ctx.createRadialGradient(hx,hy,0,hx,hy,18);
+    hg.addColorStop(0,'#88AAFF');hg.addColorStop(1,'#0033AA');
+    ctx.fillStyle=hg;ctx.beginPath();ctx.arc(hx,hy,18,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='white';ctx.font='bold 13px Space Mono';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('H',hx,hy);ctx.restore();
+  });
+  ctx.restore();
+
+  // angle label
+  ctx.fillStyle='#ffffff44';ctx.font='12px Space Mono';ctx.textAlign='center';
+  ctx.fillText('104.5°',cx,cy+70);
+  ctx.fillStyle='#FF444488';ctx.fillText('Oxygen (negative)',cx,H*.15);
+  ctx.fillStyle='#4488FF88';ctx.fillText('Hydrogen (positive)',cx,H*.85);
+  ctx.textAlign='left';
+}
+
+// ══════════════════════════════════
+//  ANIMATION: PYTHAGORAS
+// ══════════════════════════════════
+function animPythagoras(f){
+  ctx.fillStyle='#080614';ctx.fillRect(0,0,W,H);
+  const prog=Math.min(f/120,1); // animate in
+  const ox=W/2-80,oy=H/2+60;
+  const a=90,b=120;
+  const c=Math.sqrt(a*a+b*b);
+
+  // triangle
+  ctx.save();ctx.shadowBlur=10;ctx.shadowColor='#FFD700';
+  ctx.strokeStyle='#FFD700';ctx.lineWidth=2.5;
+  ctx.beginPath();
+  ctx.moveTo(ox,oy);
+  ctx.lineTo(ox+b*prog,oy);
+  ctx.lineTo(ox+b,oy-a*prog);
+  if(prog>0.99) ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
+
+  if(prog<1) return;
+
+  // right angle box
+  ctx.strokeStyle='#FFFFFF44';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(ox+b,oy);ctx.lineTo(ox+b,oy-10);ctx.lineTo(ox+b-10,oy-10);ctx.lineTo(ox+b-10,oy);ctx.closePath();ctx.stroke();
+
+  // squares on each side with pulse
+  const pulse=.8+Math.sin(f*.05)*.2;
+
+  // square on 'a' side (vertical)
+  ctx.fillStyle='#FF6B3522';ctx.strokeStyle='#FF6B35';ctx.lineWidth=1.5;
+  ctx.fillRect(ox+b,oy-a,a*pulse,a);ctx.strokeRect(ox+b,oy-a,a,a);
+  ctx.fillStyle='#FF6B35';ctx.font='13px Space Mono';ctx.textAlign='center';
+  ctx.fillText('a²='+a*a,ox+b+a*.5,oy-a*.5);
+
+  // square on 'b' side (horizontal)
+  ctx.fillStyle='#4488FF22';ctx.strokeStyle='#4488FF';ctx.lineWidth=1.5;
+  ctx.fillRect(ox,oy,b,b*pulse);ctx.strokeRect(ox,oy,b,b);
+  ctx.fillStyle='#4488FF';ctx.textAlign='center';
+  ctx.fillText('b²='+b*b,ox+b*.5,oy+b*.5);
+
+  // square on hypotenuse
+  ctx.fillStyle='#00FF8822';ctx.strokeStyle='#00FF88';ctx.lineWidth=2;
+  const cpulse=.8+Math.sin(f*.05+1)*.2;
+  ctx.save();ctx.translate(ox,oy-a);ctx.rotate(Math.atan2(a,b));
+  ctx.fillRect(0,0,c,c*cpulse);ctx.strokeRect(0,0,c,c);
+  ctx.fillStyle='#00FF88';ctx.font='12px Space Mono';ctx.textAlign='center';
+  ctx.fillText('c²='+~~(c*c),c*.5,c*.5);ctx.restore();
+
+  // formula
+  ctx.fillStyle='#FFD700';ctx.font='bold 16px Space Mono';ctx.textAlign='center';
+  ctx.fillText('a² + b² = c²',W/2,H*.92);
+  ctx.fillStyle='#FFD70088';ctx.font='11px Space Mono';
+  ctx.fillText(`${a}² + ${b}² = ${a*a} + ${b*b} = ${a*a+b*b} ≈ ${~~(c)}²`,W/2,H*.97);
+  ctx.textAlign='left';
+}
+
+// ══════════════════════════════════
+//  ANIMATION: FRACTIONS
+// ══════════════════════════════════
+function animFractions(f){
+  ctx.fillStyle='#080A05';ctx.fillRect(0,0,W,H);
+  const prog=Math.min(f/60,1);
+
+  // Pizza 1 — 1/2
+  const p1x=W*.22,p1y=H/2,pr=70;
+  ctx.save();ctx.shadowBlur=20;ctx.shadowColor='#FF6B35';
+  // full pizza
+  ctx.fillStyle='#8B4513';ctx.beginPath();ctx.arc(p1x,p1y,pr,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#FF6622';ctx.beginPath();ctx.arc(p1x,p1y,pr-5,0,Math.PI*2);ctx.fill();
+  // highlighted half
+  ctx.fillStyle='#FFD700';
+  ctx.beginPath();ctx.moveTo(p1x,p1y);ctx.arc(p1x,p1y,pr-5,0,Math.PI);ctx.closePath();ctx.fill();
+  ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(p1x-pr,p1y);ctx.lineTo(p1x+pr,p1y);ctx.stroke();
+  ctx.restore();
+  ctx.fillStyle='#FFD700';ctx.font='bold 18px Fredoka One';ctx.textAlign='center';
+  ctx.fillText('1/2',p1x,p1y+pr+25);
+
+  // plus sign
+  ctx.fillStyle='#ffffff88';ctx.font='bold 28px Space Mono';ctx.textAlign='center';
+  ctx.fillText('+',W/2,p1y+8);
+
+  // Pizza 2 — 1/3
+  const p2x=W*.62,p2y=H/2;
+  ctx.save();ctx.shadowBlur=20;ctx.shadowColor='#00FFD4';
+  ctx.fillStyle='#8B4513';ctx.beginPath();ctx.arc(p2x,p2y,pr,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#FF6622';ctx.beginPath();ctx.arc(p2x,p2y,pr-5,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#00FFD4';
+  ctx.beginPath();ctx.moveTo(p2x,p2y);ctx.arc(p2x,p2y,pr-5,-Math.PI/2,-Math.PI/2+Math.PI*2/3);ctx.closePath();ctx.fill();
+  // 3 slice lines
+  for(let i=0;i<3;i++){
+    const a=-Math.PI/2+i*Math.PI*2/3;
+    ctx.strokeStyle='#fff';ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(p2x,p2y);ctx.lineTo(p2x+Math.cos(a)*(pr-5),p2y+Math.sin(a)*(pr-5));ctx.stroke();
+  }
+  ctx.restore();
+  ctx.fillStyle='#00FFD4';ctx.font='bold 18px Fredoka One';ctx.textAlign='center';
+  ctx.fillText('1/3',p2x,p2y+pr+25);
+
+  // Result pizza
+  const rx=W/2,ry=H*.8;
+  if(prog>0.5){
+    ctx.fillStyle='#9D4EDD44';ctx.font='bold 14px Space Mono';ctx.textAlign='center';
+    ctx.fillText('= 3/6 + 2/6 = 5/6',rx,ry);
+    // small result
+    ctx.save();ctx.shadowBlur=15;ctx.shadowColor='#9D4EDD';
+    ctx.fillStyle='#4A2060';ctx.beginPath();ctx.arc(rx,ry-45,28,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#9D4EDD';
+    ctx.beginPath();ctx.moveTo(rx,ry-45);ctx.arc(rx,ry-45,25,0,Math.PI*2*5/6);ctx.closePath();ctx.fill();
+    ctx.restore();
+  }
+  ctx.textAlign='left';
+}
+
+// ══════════════════════════════════
+//  ANIMATION: ALGEBRA
+// ══════════════════════════════════
+function animAlgebra(f){
+  ctx.fillStyle='#05080F';ctx.fillRect(0,0,W,H);
+  const step=Math.floor(f/80)%4;
+  const prog=(f%80)/80;
+
+  const equations=[
+    {left:'2x + 5',right:'11',note:'నేరుగా చూపించాను',col:'#FFD700'},
+    {left:'2x + 5 − 5',right:'11 − 5',note:'రెండు వైపుల నుండి 5 తీశాను',col:'#FF6B35'},
+    {left:'2x',right:'6',note:'సరళీకరించాను',col:'#00FFD4'},
+    {left:'x',right:'3',note:'✅ x = 3 దొరికింది!',col:'#00FF88'},
+  ];
+
+  // balance beam
+  const bx=W/2,by=H*.55;
+  ctx.save();
+  const tilt=(step===3?0:(Math.sin(f*.03)*.02));
+  ctx.translate(bx,by);ctx.rotate(tilt);
+  // beam
+  ctx.strokeStyle='#FFD70066';ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(-160,0);ctx.lineTo(160,0);ctx.stroke();
+  // pivot
+  ctx.fillStyle='#FFD70088';ctx.beginPath();ctx.moveTo(-10,0);ctx.lineTo(10,0);ctx.lineTo(0,20);ctx.closePath();ctx.fill();
+  // left pan
+  ctx.strokeStyle='#FF6B3566';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(-140,0);ctx.lineTo(-140,40);ctx.lineTo(-100,40);ctx.lineTo(-100,0);ctx.stroke();
+  // right pan
+  ctx.beginPath();ctx.moveTo(100,0);ctx.lineTo(100,40);ctx.lineTo(140,40);ctx.lineTo(140,0);ctx.stroke();
+  ctx.restore();
+
+  // equation display
+  const eq=equations[step];
+  const alpha=Math.min(prog*3,1);
+  ctx.globalAlpha=alpha;
+
+  // left side
+  ctx.fillStyle=eq.col;ctx.font=`bold 22px Space Mono`;ctx.textAlign='center';
+  ctx.fillText(eq.left,W*.3,H*.45);
+  // equals
+  ctx.fillStyle='#ffffff88';ctx.fillText('=',W*.5,H*.45);
+  // right side
+  ctx.fillStyle=eq.col;ctx.fillText(eq.right,W*.7,H*.45);
+
+  // step indicator dots
+  ctx.globalAlpha=1;
+  for(let i=0;i<4;i++){
+    ctx.fillStyle=i<=step?'#FFD700':'#333';
+    ctx.beginPath();ctx.arc(W/2-45+i*30,H*.15,6,0,Math.PI*2);ctx.fill();
+  }
+
+  // note
+  ctx.fillStyle='#ffffff55';ctx.font='12px Space Mono';ctx.textAlign='center';
+  ctx.fillText(eq.note,W/2,H*.78);
+
+  // final answer pop
+  if(step===3&&prog>.5){
+    ctx.save();
+    const sc=1+Math.sin(f*.1)*.05;
+    ctx.translate(W/2,H*.88);ctx.scale(sc,sc);
+    ctx.fillStyle='#00FF88';ctx.font='bold 18px Fredoka One';ctx.textAlign='center';
+    ctx.shadowBlur=20;ctx.shadowColor='#00FF88';
+    ctx.fillText('x = 3  గెలిచావు! 🎉',0,0);
+    ctx.restore();
+  }
+  ctx.globalAlpha=1;ctx.textAlign='left';
+}
+
+// ══════════════════════════════════
+//  ANIMATION: CIRCLE
+// ══════════════════════════════════
+function animCircle(f){
+  ctx.fillStyle='#050510';ctx.fillRect(0,0,W,H);
+  const cx=W*.4,cy=H/2,r=90;
+  const prog=Math.min(f/100,1);
+
+  // circle drawing animation
+  ctx.save();ctx.shadowBlur=20;ctx.shadowColor='#4488FF';
+  ctx.strokeStyle='#4488FF';ctx.lineWidth=2.5;
+  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2*prog);ctx.stroke();
+  ctx.restore();
+
+  if(prog<0.3) return;
+
+  // center dot
+  ctx.fillStyle='#FFD700';ctx.shadowBlur=10;ctx.shadowColor='#FFD700';
+  ctx.beginPath();ctx.arc(cx,cy,4,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+
+  // radius line (animated)
+  const ra=f*.02;
+  ctx.strokeStyle='#FFD700AA';ctx.lineWidth=2;ctx.setLineDash([5,3]);
+  ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+Math.cos(ra)*r,cy+Math.sin(ra)*r);ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='#FFD700';ctx.font='13px Space Mono';ctx.textAlign='center';
+  ctx.fillText('r',cx+Math.cos(ra)*r*.5+8,cy+Math.sin(ra)*r*.5);
+
+  // diameter
+  ctx.strokeStyle='#FF6B3566';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(cx-r,cy);ctx.lineTo(cx+r,cy);ctx.stroke();
+  ctx.fillStyle='#FF6B35AA';ctx.font='11px Space Mono';ctx.textAlign='center';
+  ctx.fillText('diameter = 2r',cx,cy-r-12);
+
+  // formulas panel
+  ctx.fillStyle='#0D0A1A';ctx.fillRect(W*.62,H*.15,W*.33,H*.65);
+  ctx.strokeStyle='#9D4EDD44';ctx.lineWidth=1;ctx.strokeRect(W*.62,H*.15,W*.33,H*.65);
+
+  const lines=[
+    {t:'Circumference',c:'#00FFD4'},
+    {t:'= 2πr',c:'#00FFD4'},
+    {t:'≈ '+~~(2*3.14159*r),c:'#00FFD4'},
+    {t:'',c:''},
+    {t:'Area',c:'#FF6B35'},
+    {t:'= πr²',c:'#FF6B35'},
+    {t:'≈ '+~~(3.14159*r*r),c:'#FF6B35'},
+    {t:'',c:''},
+    {t:'π ≈ 3.14159',c:'#FFD700'},
+  ];
+  lines.forEach((l,i)=>{
+    if(!l.t) return;
+    ctx.fillStyle=l.c;ctx.font='12px Space Mono';ctx.textAlign='left';
+    ctx.fillText(l.t,W*.65,H*.25+i*22);
+  });
+  ctx.textAlign='left';
+}
+
+// ══════════════════════════════════
+//  ANIMATION: RAINBOW
+// ══════════════════════════════════
+function animRainbow(f){
+  ctx.fillStyle='#050810';ctx.fillRect(0,0,W,H);
+  // sun
+  ctx.save();ctx.shadowBlur=40;ctx.shadowColor='#FFD700';
+  ctx.fillStyle='#FFD700';ctx.beginPath();ctx.arc(W*.15,H*.25,35,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+
+  // light ray
+  ctx.save();ctx.globalAlpha=.3;ctx.strokeStyle='#FFFFFF';ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(W*.15+35,H*.25);ctx.lineTo(W*.45,H*.55);ctx.stroke();
+  ctx.restore();
+
+  // water droplet
+  ctx.save();ctx.shadowBlur=15;ctx.shadowColor='#4488FF';
+  ctx.strokeStyle='#4488FF';ctx.lineWidth=2;ctx.fillStyle='#4488FF22';
+  ctx.beginPath();ctx.arc(W*.45,H*.55,20,0,Math.PI*2);ctx.fill();ctx.stroke();
+  ctx.restore();
+
+  // rainbow arcs
+  const COLS=['#FF0000','#FF7700','#FFFF00','#00FF00','#0000FF','#4400FF','#8800FF'];
+  const prog=Math.min(f/80,1);
+  COLS.forEach((col,i)=>{
+    const r=140+i*12;
+    ctx.save();ctx.shadowBlur=8;ctx.shadowColor=col;
+    ctx.strokeStyle=col;ctx.lineWidth=10;ctx.globalAlpha=.7*prog;
+    ctx.beginPath();ctx.arc(W*.5,H*.9,r,Math.PI,Math.PI*2*prog+Math.PI);ctx.stroke();
+    ctx.restore();
+  });
+
+  // VIBGYOR labels
+  if(prog>.8){
+    const names=['Red','Orange','Yellow','Green','Blue','Indigo','Violet'];
+    names.forEach((n,i)=>{
+      ctx.fillStyle=COLS[COLS.length-1-i];ctx.font='9px Space Mono';
+      ctx.textAlign='right';
+      ctx.fillText(n,W*.5-30,H*.9-(140+(COLS.length-1-i)*12));
+    });
+  }
+  ctx.textAlign='left';
+}
+
+// ══════════════════════════════════
+//  ANIMATION: HEART
+// ══════════════════════════════════
+function animHeart(f){
+  ctx.fillStyle='#080205';ctx.fillRect(0,0,W,H);
+  const beat=Math.sin(f*.08);
+  const sc=1+beat*.06;
+  const cx=W/2,cy=H/2;
+
+  ctx.save();ctx.translate(cx,cy);ctx.scale(sc,sc);
+  // heart shape
+  ctx.save();ctx.shadowBlur=30;ctx.shadowColor='#FF2244';
+  ctx.fillStyle='#CC0022';
+  ctx.beginPath();
+  ctx.moveTo(0,30);
+  ctx.bezierCurveTo(-60,0,-80,-60,-30,-70);
+  ctx.bezierCurveTo(0,-80,0,-50,0,-50);
+  ctx.bezierCurveTo(0,-50,0,-80,30,-70);
+  ctx.bezierCurveTo(80,-60,60,0,0,30);
+  ctx.fill();ctx.restore();
+
+  // chambers
+  ctx.strokeStyle='#FF4466AA';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(0,-50);ctx.lineTo(0,30);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(-30,-10);ctx.lineTo(30,-10);ctx.stroke();
+  ctx.fillStyle='#FF8899AA';ctx.font='9px Space Mono';ctx.textAlign='center';
+  ctx.fillText('RA',-20,-30);ctx.fillText('LA',20,-30);
+  ctx.fillText('RV',-20,10);ctx.fillText('LV',20,10);
+  ctx.restore();
+
+  // pulse wave
+  const pw=W*.8;
+  ctx.strokeStyle='#FF224444';ctx.lineWidth=1;
+  ctx.beginPath();
+  for(let x=W*.1;x<W*.9;x++){
+    const px=x-W*.1;
+    const py=cy+H*.3+Math.sin((px/pw*Math.PI*4)+(f*.08))*25*Math.exp(-((px-pw*.5)**2)/(pw*pw*.05));
+    px===0?ctx.moveTo(x,py):ctx.lineTo(x,py);
+  }
+  ctx.stroke();
+
+  // BPM counter
+  const bpm=60+~~(beat*8);
+  ctx.fillStyle='#FF2244';ctx.font='bold 14px Space Mono';ctx.textAlign='center';
+  ctx.shadowBlur=10;ctx.shadowColor='#FF2244';
+  ctx.fillText(`♥ ${bpm} BPM`,cx,H*.9);
+  ctx.shadowBlur=0;ctx.textAlign='left';
+}
+
+// ══════════════════════════════════
+//  ANIMATION: PHOTOSYNTHESIS
+// ══════════════════════════════════
+function animPhotosynthesis(f){
+  ctx.fillStyle='#030A05';ctx.fillRect(0,0,W,H);
+  // sky
+  const sky=ctx.createLinearGradient(0,0,0,H*.6);
+  sky.addColorStop(0,'#0A1A28');sky.addColorStop(1,'#0A2010');
+  ctx.fillStyle=sky;ctx.fillRect(0,0,W,H*.6);
+  // ground
+  ctx.fillStyle='#1A3A0A';ctx.fillRect(0,H*.6,W,H*.4);
+
+  // sun
+  ctx.save();ctx.shadowBlur=50;ctx.shadowColor='#FFD700';
+  ctx.fillStyle='#FFD700';ctx.beginPath();ctx.arc(W*.85,H*.1,35,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+
+  // sunlight rays to leaf
+  for(let i=0;i<5;i++){
+    const prog=((f*.8+i*40)%120)/120;
+    ctx.save();ctx.globalAlpha=.3*prog*(1-prog)*4;
+    ctx.strokeStyle='#FFD700';ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.moveTo(W*.85,H*.1);
+    ctx.lineTo(W*.5+Math.cos(i*.3)*20,H*.35);
+    ctx.stroke();ctx.restore();
+  }
+
+  // tree trunk
+  ctx.fillStyle='#5C3317';ctx.fillRect(W*.47,H*.55,W*.06,H*.2);
+
+  // leaf (big)
+  ctx.save();ctx.translate(W*.5,H*.35);ctx.shadowBlur=20;ctx.shadowColor='#00AA33';
+  ctx.fillStyle='#00AA33';ctx.beginPath();
+  ctx.ellipse(0,0,70,40,0,0,Math.PI*2);ctx.fill();
+  // leaf vein
+  ctx.strokeStyle='#00FF6633';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(-60,0);ctx.lineTo(60,0);ctx.stroke();
+  ctx.restore();
+
+  // CO2 particles coming in
+  for(let i=0;i<4;i++){
+    const px=W*.1+((f*.5+i*60)%W*.3);
+    const py=H*.3+Math.sin(f*.03+i)*20;
+    ctx.save();ctx.fillStyle='#88AAFF';ctx.globalAlpha=.8;
+    ctx.beginPath();ctx.arc(px,py,5,0,Math.PI*2);ctx.fill();
+    ctx.font='8px Space Mono';ctx.fillStyle='#88AAFF';ctx.textAlign='center';
+    ctx.fillText('CO₂',px,py-10);ctx.restore();
+  }
+
+  // O2 particles coming out
+  for(let i=0;i<4;i++){
+    const px=W*.6+((f*.5+i*55)%W*.35);
+    const py=H*.2-((f*.4+i*40)%H*.4);
+    if(py>0){
+      ctx.save();ctx.fillStyle='#00FF88';ctx.globalAlpha=.8;
+      ctx.beginPath();ctx.arc(px,py,5,0,Math.PI*2);ctx.fill();
+      ctx.font='8px Space Mono';ctx.fillStyle='#00FF88';ctx.textAlign='center';
+      ctx.fillText('O₂',px,py-10);ctx.restore();
+    }
+  }
+
+  // water droplets up trunk
+  for(let i=0;i<3;i++){
+    const py=H*.7-((f*.6+i*30)%H*.15);
+    ctx.fillStyle='#4488FF';ctx.globalAlpha=.7;
+    ctx.beginPath();ctx.arc(W*.5,py,4,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+  }
+
+  // glucose label
+  ctx.fillStyle='#FFD70088';ctx.font='11px Space Mono';ctx.textAlign='center';
+  const gp=.5+Math.sin(f*.05)*.1;
+  ctx.globalAlpha=gp;
+  ctx.fillText('Glucose ✨',W*.5,H*.42);
+  ctx.globalAlpha=1;
+  // equation
+  ctx.fillStyle='#00FF8866';ctx.font='10px Space Mono';ctx.textAlign='center';
+  ctx.fillText('6CO₂ + 6H₂O + light → C₆H₁₂O₆ + 6O₂',W*.5,H*.95);
+  ctx.textAlign='left';
+}
+
+// ══════════════════════════════════
+//  ANIMATION: GENERAL
+// ══════════════════════════════════
+function animGeneral(f){
+  ctx.fillStyle='#07050F';ctx.fillRect(0,0,W,H);
+  const cx=W/2,cy=H/2;
+  // orbiting dots
+  for(let i=0;i<6;i++){
+    const a=f*.02+i*Math.PI/3;
+    const r=80+Math.sin(f*.03+i)*20;
+    const x=cx+Math.cos(a)*r,y=cy+Math.sin(a)*r;
+    ctx.save();ctx.shadowBlur=15;ctx.shadowColor=COLS[i%COLS.length];
+    ctx.fillStyle=COLS[i%COLS.length];ctx.beginPath();ctx.arc(x,y,8,0,Math.PI*2);ctx.fill();ctx.restore();
+  }
+  ctx.fillStyle='#FFD700';ctx.font='bold 14px Fredoka One';ctx.textAlign='center';
+  ctx.fillText('SIA వివరిస్తోంది...',cx,cy);
+  ctx.textAlign='left';
+}
+
+const COLS=['#FF4500','#FF6B00','#FFD700','#9D4EDD','#00FFD4','#00FF88','#FF2D7A'];
+
+// ══════════════════════════════════
+//  INIT
+// ══════════════════════════════════
+window.addEventListener('resize',()=>{
+  if(document.getElementById('stage').classList.contains('visible')) resize();
+});
+</script>
+</body>
+</html>
