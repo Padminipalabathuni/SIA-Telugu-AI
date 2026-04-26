@@ -265,8 +265,12 @@ def get_realtime_sky():
 
 # ── Battery ──
 def get_battery():
-    b=psutil.sensors_battery()
-    return (b.percent,b.power_plugged) if b else (None,None)
+    try:
+        if not psutil: return (None,None)
+        b=psutil.sensors_battery()
+        return (b.percent,b.power_plugged) if b else (None,None)
+    except:
+        return (None,None)
 
 def battery_alert():
     p,plugged=get_battery()
