@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="te">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIA — GenAI Pipeline</title>
+<link href="https://fonts.googleapis.com/css2?family=Tiro+Telugu&family=Outfit:wght@200;400;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#04020C;--surface:#0A0818;--border:#1A1430;
+  --gold:#FFD700;--fire:#FF6B35;--text:#F0EAF8;--muted:#6A5A8A;
+  --accent:#FF6B35;--green:#00FF88;--cyan:#00FFD4;--purple:#9D4EDD;
+}
+body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;width:100vw;height:100vh;overflow:hidden;cursor:none;}
+
+/* ── World themes ── */
+body.world-science {--accent:#00FF88;--bg:#020A04;}
+body.world-fun     {--accent:#FF2D7A;--bg:#0A0204;}
+body.world-space   {--accent:#4488FF;--bg:#000208;}
+body.world-spiritual{--accent:#9D4EDD;--bg:#06020A;}
+
+/* ── Cursor ── */
+#cur{position:fixed;width:18px;height:18px;border:1.5px solid var(--gold);border-radius:50%;pointer-events:none;z-index:9999;mix-blend-mode:screen;transition:transform .08s,border-color .3s;}
+#cur.active{transform:scale(2.5);border-color:var(--accent);}
+#cur-dot{position:fixed;width:3px;height:3px;background:var(--gold);border-radius:50%;pointer-events:none;z-index:9999;}
+
+canvas{position:fixed;top:0;left:0;z-index:0;}
+
+/* ── Pipeline Visualizer ── */
+#pipeline{
+  position:fixed;top:1rem;left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;gap:.3rem;z-index:100;
+  pointer-events:none;
+  background:rgba(10,8,24,.85);border:1px solid var(--border);
+  border-radius:30px;padding:.4rem 1rem;backdrop-filter:blur(20px);
+}
+.pipe-step{
+  display:flex;align-items:center;gap:.3rem;
+  padding:.25rem .6rem;border-radius:20px;
+  font-size:.52rem;letter-spacing:1.5px;text-transform:uppercase;
+  font-family:'Space Mono',monospace;color:var(--muted);
+  border:1px solid transparent;transition:all .4s;
+}
+.pipe-step.active{color:var(--accent);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);box-shadow:0 0 12px color-mix(in srgb,var(--accent) 30%,transparent);}
+.pipe-step.done{color:#444;border-color:#222;}
+.pipe-dot{width:5px;height:5px;border-radius:50%;background:currentColor;}
+.pipe-arrow{color:#2a2040;font-size:.6rem;}
+
+/* ── Header ── */
+#header{position:fixed;top:3.5rem;left:2rem;right:2rem;display:flex;justify-content:space-between;align-items:center;z-index:100;pointer-events:none;}
+.logo{font-family:'Tiro Telugu',serif;font-size:2rem;background:linear-gradient(135deg,var(--fire),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:4px;}
+.logo-sub{color:var(--muted);font-size:.5rem;letter-spacing:3px;text-transform:uppercase;}
+#mode-badge{display:inline-flex;align-items:center;gap:.4rem;padding:.35rem .9rem;border-radius:20px;border:1px solid var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent);color:var(--accent);font-size:.55rem;letter-spacing:2px;text-transform:uppercase;font-family:'Space Mono',monospace;transition:all .5s;}
+.mode-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);animation:pulse 1.5s infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(1.5);}}
+
+/* ── Score ── */
+#score-panel{position:fixed;top:3.5rem;right:2rem;text-align:right;pointer-events:none;z-index:100;}
+#score-val{font-family:'Outfit',sans-serif;font-weight:900;font-size:1.8rem;color:var(--gold);line-height:1;}
+#score-sub{color:var(--muted);font-size:.5rem;letter-spacing:2px;text-transform:uppercase;}
+#streak-el{color:var(--fire);font-size:.6rem;letter-spacing:1px;}
+
+/* ── Response Card ── */
+#response-card{
+  position:fixed;top:50%;left:50%;transform:translate(-50%,-55%);
+  width:min(600px,88vw);z-index:20;pointer-events:none;
+  opacity:0;transition:opacity .4s;
+}
+#response-card.show{opacity:1;}
+#response-world-label{font-size:.55rem;letter-spacing:3px;text-transform:uppercase;color:var(--accent);margin-bottom:.4rem;font-family:'Space Mono',monospace;}
+#response-text{
+  font-family:'Tiro Telugu',serif;font-size:1.05rem;line-height:1.7;
+  color:var(--text);text-align:center;
+  text-shadow:0 0 40px color-mix(in srgb,var(--accent) 30%,transparent);
+}
+#response-rag-tag{
+  margin-top:.5rem;font-size:.55rem;letter-spacing:2px;
+  color:var(--green);font-family:'Space Mono',monospace;
+  opacity:.6;text-align:center;
+}
+
+/* ── Living Sentence ── */
+#sentence-area{
+  position:fixed;top:58%;left:50%;transform:translateX(-50%);
+  width:min(680px,92vw);text-align:center;z-index:15;
+  pointer-events:none;display:none;
+}
+.word-token{
+  display:inline-block;margin:3px;
+  font-family:'Tiro Telugu',serif;font-size:1rem;
+  padding:3px 9px;border-radius:8px;
+  border:1px solid var(--accent);color:var(--text);
+  opacity:0;transform:translateY(20px) scale(.8);
+  transition:all .4s cubic-bezier(.34,1.56,.64,1);
+  background:color-mix(in srgb,var(--accent) 6%,transparent);
+}
+.word-token.born{opacity:1;transform:translateY(0) scale(1);}
+
+/* ── Echo Layer ── */
+#echo-layer{position:fixed;inset:0;pointer-events:none;z-index:8;}
+.echo-word{position:absolute;font-family:'Tiro Telugu',serif;pointer-events:none;animation:echoFade 2.5s ease-out forwards;white-space:nowrap;}
+@keyframes echoFade{0%{opacity:.5;transform:scale(1);}100%{opacity:0;transform:scale(1.4) translateY(-25px);}}
+
+/* ── Combo ── */
+#combo-el{position:fixed;top:6rem;left:50%;transform:translateX(-50%);font-family:'Outfit',sans-serif;font-weight:900;font-size:1.6rem;color:var(--gold);text-shadow:0 0 30px var(--gold);pointer-events:none;z-index:500;opacity:0;transition:opacity .2s;letter-spacing:3px;}
+#combo-el.show{opacity:1;}
+
+/* ── Emotion Ring ── */
+#emotion-ring{position:fixed;bottom:5rem;left:1.5rem;width:50px;height:50px;pointer-events:none;z-index:100;}
+#emotion-label{position:fixed;bottom:4rem;left:1.5rem;font-size:.5rem;letter-spacing:2px;color:var(--muted);pointer-events:none;z-index:100;width:50px;text-align:center;text-transform:uppercase;font-family:'Space Mono',monospace;}
+
+/* ── Input ── */
+#input-wrap{position:fixed;bottom:5rem;left:50%;transform:translateX(-50%);width:min(580px,90vw);pointer-events:all;display:flex;flex-direction:column;gap:.5rem;}
+#query-box{width:100%;padding:.85rem 1.1rem;background:rgba(10,8,24,.9);border:1px solid var(--border);border-radius:14px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.88rem;outline:none;backdrop-filter:blur(20px);transition:border-color .3s,box-shadow .3s;}
+#query-box:focus{border-color:var(--accent);box-shadow:0 0 25px color-mix(in srgb,var(--accent) 20%,transparent);}
+#query-box::placeholder{color:var(--muted);}
+.chips{display:flex;gap:.35rem;flex-wrap:wrap;justify-content:center;}
+.chip{padding:3px 11px;border-radius:20px;font-size:.58rem;letter-spacing:1px;cursor:pointer;border:1px solid var(--border);color:var(--muted);background:rgba(10,8,24,.7);transition:all .2s;font-family:'Space Mono',monospace;}
+.chip:hover{border-color:var(--accent);color:var(--accent);}
+
+/* ── Dock ── */
+#dock{position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);display:flex;gap:.4rem;z-index:200;pointer-events:all;flex-wrap:wrap;justify-content:center;max-width:95vw;}
+.btn{background:rgba(8,6,20,.85);border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:6px;font-size:.55rem;letter-spacing:2px;cursor:pointer;text-transform:uppercase;font-family:'Space Mono',monospace;transition:all .2s;backdrop-filter:blur(8px);}
+.btn:hover,.btn.on{border-color:var(--accent);color:var(--accent);box-shadow:0 0 12px color-mix(in srgb,var(--accent) 25%,transparent);}
+
+/* ── Loading spinner ── */
+#loading-el{position:fixed;top:45%;left:50%;transform:translate(-50%,-50%);z-index:30;pointer-events:none;opacity:0;transition:opacity .3s;text-align:center;}
+#loading-el.show{opacity:1;}
+.spinner{width:40px;height:40px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto .6rem;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-text{font-size:.6rem;letter-spacing:3px;color:var(--accent);font-family:'Space Mono',monospace;text-transform:uppercase;}
+
+/* Ripple */
+.rip{position:fixed;border-radius:50%;border:1.5px solid var(--gold);pointer-events:none;animation:ripOut .7s ease-out forwards;z-index:300;mix-blend-mode:screen;}
+@keyframes ripOut{0%{width:0;height:0;opacity:.9;margin:0;}100%{width:180px;height:180px;opacity:0;margin:-90px;}}
+
+/* Score popup */
+.score-pop{position:fixed;pointer-events:none;z-index:600;font-family:'Outfit',sans-serif;font-weight:700;font-size:1.1rem;animation:scoreUp .8s ease-out forwards;}
+@keyframes scoreUp{0%{opacity:1;transform:translateY(0);}100%{opacity:0;transform:translateY(-50px) scale(1.4);}}
+
+#scan{position:fixed;inset:0;pointer-events:none;z-index:400;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.022) 2px,rgba(0,0,0,.022) 4px);}
+#vig{position:fixed;inset:0;pointer-events:none;z-index:2;background:radial-gradient(ellipse at center,transparent 30%,rgba(4,2,12,.65) 100%);}
+.world-flash{position:fixed;inset:0;z-index:1000;pointer-events:none;opacity:0;animation:wFlash .6s ease-out forwards;}
+@keyframes wFlash{0%{opacity:.35;}100%{opacity:0;}}
+</style>
+</head>
+<body>
+<div id="scan"></div>
+<div id="vig"></div>
+<div id="cur"></div>
+<div id="cur-dot"></div>
+<canvas id="c"></canvas>
+<div id="echo-layer"></div>
+<div id="sentence-area"></div>
+
+<!-- Pipeline Visualizer -->
+<div id="pipeline">
+  <div class="pipe-step" id="ps-input"><span class="pipe-dot"></span>Input</div>
+  <div class="pipe-arrow">→</div>
+  <div class="pipe-step" id="ps-rag"><span class="pipe-dot"></span>RAG</div>
+  <div class="pipe-arrow">→</div>
+  <div class="pipe-step" id="ps-prompt"><span class="pipe-dot"></span>Prompt</div>
+  <div class="pipe-arrow">→</div>
+  <div class="pipe-step" id="ps-llm"><span class="pipe-dot"></span>LLM</div>
+  <div class="pipe-arrow">→</div>
+  <div class="pipe-step" id="ps-emotion"><span class="pipe-dot"></span>Emotion</div>
+  <div class="pipe-arrow">→</div>
+  <div class="pipe-step" id="ps-world"><span class="pipe-dot"></span>World</div>
+  <div class="pipe-arrow">→</div>
+  <div class="pipe-step" id="ps-ui"><span class="pipe-dot"></span>UX</div>
+</div>
+
+<!-- Header -->
+<div id="header">
+  <div>
+    <div class="logo">🕉 SIA</div>
+    <div class="logo-sub">GenAI Pipeline · Telugu AI</div>
+  </div>
+  <div id="mode-badge"><span class="mode-dot"></span><span id="mode-label">GRAVITY</span></div>
+</div>
+
+<!-- Score -->
+<div id="score-panel">
+  <div id="score-val">0</div>
+  <div id="score-sub">పాయింట్లు</div>
+  <div id="streak-el"></div>
+</div>
+
+<!-- Loading -->
+<div id="loading-el">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loading-text">Processing...</div>
+</div>
+
+<!-- Response -->
+<div id="response-card">
+  <div id="response-world-label"></div>
+  <div id="response-text"></div>
+  <div id="response-rag-tag"></div>
+</div>
+
+<!-- Emotion Ring -->
+<canvas id="emotion-ring" width="50" height="50"></canvas>
+<div id="emotion-label">Neutral</div>
+
+<!-- Combo -->
+<div id="combo-el"></div>
+
+<!-- Input -->
+<div id="input-wrap">
+  <input id="query-box" type="text" placeholder="మాట్లాడు SIA తో... Type here and watch the pipeline!" autocomplete="off">
+  <div class="chips">
+    <div class="chip" onclick="run('DNA అంటే ఏమిటి?')">🧬 DNA</div>
+    <div class="chip" onclick="run('నేను చాలా happy గా ఉన్నాను!')">😄 Happy</div>
+    <div class="chip" onclick="run('Solar system explain చేయి')">🪐 Space</div>
+    <div class="chip" onclick="run('ఓం శాంతి ప్రేమ భక్తి')">🙏 Spiritual</div>
+    <div class="chip" onclick="run('వావ్ ఇది చాలా cool బ్రో!')">🔥 Fun</div>
+    <div class="chip" onclick="run('2x + 5 = 11 solve చేయి')">📐 Math</div>
+    <div class="chip" onclick="run('నేను చాలా tired bore గా ఉన్నాను')">😴 Tired</div>
+  </div>
+</div>
+
+<!-- Dock -->
+<div id="dock">
+  <button class="btn on" id="b-gravity" onclick="setMode('gravity')"><span>🌀 Gravity</span></button>
+  <button class="btn"    id="b-echo"    onclick="setMode('echo')"><span>🌊 Echo</span></button>
+  <button class="btn"    id="b-emotion" onclick="setMode('emotion')"><span>🎭 Emotion</span></button>
+  <button class="btn"    id="b-living"  onclick="setMode('living')"><span>🧬 Living</span></button>
+  <button class="btn"    id="b-combo"   onclick="setMode('combo')"><span>🎮 Combo</span></button>
+  <button class="btn"    id="b-reality" onclick="setMode('reality')"><span>🌌 Reality</span></button>
+  <button class="btn"    id="b-auto"    onclick="setMode('auto')"><span>🚀 AUTO</span></button>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════
+//  1. KNOWLEDGE BASE (RAG)
+//  "Lightweight Retrieval-Augmented Generation"
+// ═══════════════════════════════════════════
+const KNOWLEDGE = [
+  {topic:"DNA",       keywords:["dna","genetic","chromosome","double helix","nucleotide"],
+   content:"DNA (Deoxyribonucleic Acid) is the genetic blueprint of all living things. It consists of a double helix structure with base pairs A-T and G-C. Human DNA contains ~3 billion base pairs encoding ~20,000 genes."},
+
+  {topic:"Telugu",    keywords:["telugu","తెలుగు","andhra","telangana","language","భాష"],
+   content:"Telugu is a Dravidian language spoken by 82 million people worldwide. It is the official language of Andhra Pradesh and Telangana. Telugu script is known as 'the Italian of the East' for its melodious sound. It is 2000+ years old."},
+
+  {topic:"solar system",keywords:["solar","planet","sun","mars","jupiter","saturn","moon","space","galaxy"],
+   content:"The solar system has 8 planets: Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune. The Sun contains 99.86% of the solar system's mass. Jupiter is the largest planet. Saturn has iconic rings made of ice and rock."},
+
+  {topic:"photosynthesis",keywords:["photosynthesis","plant","chlorophyll","sunlight","co2","oxygen"],
+   content:"Photosynthesis: 6CO₂ + 6H₂O + light energy → C₆H₁₂O₆ + 6O₂. Plants use chlorophyll to convert sunlight into glucose. This process produces oxygen as a byproduct and is the basis of most life on Earth."},
+
+  {topic:"math algebra",keywords:["solve","equation","algebra","2x","variable","math","calculate"],
+   content:"Algebra solves for unknown variables. Balance method: perform same operation on both sides. Example: 2x+5=11 → subtract 5 → 2x=6 → divide by 2 → x=3. Always verify by substituting back."},
+
+  {topic:"panchangam",  keywords:["panchangam","nakshatra","tithi","rahukalam","festival","పంచాంగం","పండుగ"],
+   content:"Telugu Panchangam tracks 5 elements: Tithi (lunar day), Vara (weekday), Nakshatra (star), Yoga, Karana. Rahukalam is inauspicious time. Amrutakalam is auspicious. Nakshatra determines personality and compatibility."},
+
+  {topic:"AI Indic",   keywords:["sarvam","ai4bharat","indic","whisper","llm","model","nlp","speech"],
+   content:"Sarvam AI builds full-stack Indic language AI. AI4Bharat's IndicWhisper is a speech recognition model for 22 Indian languages. IndicBERT is a multilingual model. These are pioneering Telugu NLP research."},
+
+  {topic:"ramayana",   keywords:["ramayana","rama","sita","ravana","hanuman","రామాయణం"],
+   content:"Ramayana: Prince Rama of Ayodhya, accompanied by Lakshmana and Hanuman, rescues his wife Sita from demon king Ravana of Lanka. The epic teaches: dharma always prevails over adharma. Valmiki wrote the original Sanskrit version."},
+
+  {topic:"meditation", keywords:["peace","calm","stress","meditation","breathing","relax","శాంతి","breathe"],
+   content:"Simple meditation: 4-7-8 breathing. Inhale 4 seconds, hold 7 seconds, exhale 8 seconds. Reduces cortisol by 20%. Even 5 minutes reduces anxiety. Focus on breath, let thoughts pass like clouds."},
+
+  {topic:"water cycle", keywords:["water","rain","cloud","evaporation","cycle","నీళ్ళు","వర్షం"],
+   content:"Water Cycle: Evaporation (water→vapor from sun heat) → Condensation (vapor→clouds) → Precipitation (rain/snow) → Runoff (back to ocean/ground). Average water molecule completes cycle in 9 days."},
+];
+
+// ═══════════════════════════════════════════
+//  RAG RETRIEVAL FUNCTION
+// ═══════════════════════════════════════════
+function retrieveContext(query) {
+  const ql = query.toLowerCase();
+  let best = null, bestScore = 0;
+
+  KNOWLEDGE.forEach(k => {
+    const score = k.keywords.filter(kw => ql.includes(kw)).length;
+    if (score > bestScore) { bestScore = score; best = k; }
+  });
+
+  return bestScore > 0 ? best : null;
+}
+
+// ═══════════════════════════════════════════
+//  2. PROMPT ENGINEERING LAYER
+// ═══════════════════════════════════════════
+function buildSystemPrompt(emotion, world, dialect) {
+  const toneMap = {
+    happy:    "Be celebratory, enthusiastic, use positive Telugu slang",
+    sad:      "Be warm, gentle, empathetic. Prioritize emotional support",
+    angry:    "Be calm, direct, validating. Avoid dismissing feelings",
+    tired:    "Be brief, encouraging. Suggest rest if appropriate",
+    excited:  "Match their energy! Be dynamic and enthusiastic",
+    calm:     "Be peaceful, measured, thoughtful in tone",
+    neutral:  "Be helpful, clear, and friendly"
+  };
+
+  const worldContext = {
+    science:  "Focus on accuracy, use scientific terminology naturally",
+    fun:      "Be playful, use humor, casual Telugu expressions",
+    space:    "Use cosmic metaphors, convey wonder and scale",
+    spiritual:"Be respectful, use Sanskrit/Telugu spiritual terms",
+    default:  "Be culturally aware, use natural Telugu"
+  };
+
+  return `You are SIA — a Telugu AI Companion. Smart, culturally deep, emotionally intelligent.
+
+TONE: ${toneMap[emotion] || toneMap.neutral}
+DOMAIN: ${worldContext[world] || worldContext.default}
+LANGUAGE: Always reply in Telugu. Use natural conversational style.
+FORMAT: 2-3 sentences max. Clear, warm, actionable.
+DIALECT: ${dialect !== 'neutral' ? `User speaks ${dialect} Telugu — match their style` : 'Use neutral Telugu'}`;
+}
+
+// ═══════════════════════════════════════════
+//  3. LLM API CALL (Anthropic Claude)
+//  This is the real GenAI pipeline call
+// ═══════════════════════════════════════════
+async function callLLM(query, context, systemPrompt) {
+  const contextStr = context
+    ? `\n\nRelevant Knowledge (RAG):\n${context.content}\n\n`
+    : '';
+
+  const userMessage = `${contextStr}User Query: ${query}
+
+Please respond naturally in Telugu, keeping it concise and helpful.`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userMessage }]
+      })
+    });
+
+    if (!response.ok) throw new Error(`API error: ${response.status}`);
+    const data = await response.json();
+    return data.content?.[0]?.text || generateFallback(query, context);
+  } catch (err) {
+    console.warn('LLM API call:', err.message);
+    return generateFallback(query, context);
+  }
+}
+
+// Smart fallback using RAG context
+function generateFallback(query, context) {
+  if (context) {
+    const snippet = context.content.slice(0, 200);
+    const responses = [
+      `${context.topic} గురించి చెప్తాను: ${snippet.slice(0,120)}...`,
+      `మీ question బాగుంది! ${context.topic} అంటే: ${snippet.slice(0,100)}`,
+      `${context.topic} గురించి: ${snippet.slice(0,150)}`,
+    ];
+    return responses[Math.floor(Math.random() * responses.length)];
+  }
+
+  const world = detectWorld(query);
+  const fallbacks = {
+    science:  "మీ science question బాగుంది! SIA దాన్ని analyze చేస్తోంది... Facts loading! 🧬",
+    fun:      "వావ్ బ్రో! SIA మీతో ఉంది! మస్తుగా మాట్లాడదాం! 🔥",
+    space:    "విశ్వం అద్భుతమైనది! గ్రహాలు, నక్షత్రాలు... SIA తో explore చేద్దాం! 🌌",
+    spiritual:"శాంతి... SIA మీ spiritual journey లో companion గా ఉంటుంది 🙏",
+    default:  "SIA వింటోంది! మీ question fascinating గా ఉంది. మరింత చెప్పండి! ✨"
+  };
+  return fallbacks[world] || fallbacks.default;
+}
+
+// ═══════════════════════════════════════════
+//  4. DETECTION ENGINES
+// ═══════════════════════════════════════════
+function detectEmotion(text) {
+  const tl = text.toLowerCase();
+  if (/happy|excited|great|wow|amazing|సంతోషం|చాలా బాగుంది|yayyy|🎉/.test(tl)) return 'happy';
+  if (/sad|cry|alone|hurt|దుఃఖం|ఏడుపు|miss|depressed/.test(tl))              return 'sad';
+  if (/angry|frustrated|hate|కోపం|annoyed/.test(tl))                          return 'angry';
+  if (/tired|bore|sleep|నిద్ర|అలసట|బోర్|lazy/.test(tl))                      return 'tired';
+  if (/calm|peace|relax|శాంతి|breathe|meditat/.test(tl))                      return 'calm';
+  if (/omg|insane|crazy|incredible|🤯|wow/.test(tl))                          return 'excited';
+  return 'neutral';
+}
+
+function detectWorld(text) {
+  const tl = text.toLowerCase();
+  if (/dna|cell|atom|science|biology|chemistry|molecule|photosynthesis|జీవ|water cycle/.test(tl)) return 'science';
+  if (/planet|space|star|galaxy|universe|cosmos|నక్షత్రం|గ్రహం|moon|mars|solar/.test(tl))        return 'space';
+  if (/om|pray|mantra|spiritual|god|bhakti|peace|శాంతి|ఓం|భక్తి|ధర్మం|temple|రామాయణం/.test(tl)) return 'spiritual';
+  if (/fun|cool|bro|vibe|happy|party|music|dance|😄|🎉|🔥|మస్తు|సూపర్/.test(tl))               return 'fun';
+  return 'default';
+}
+
+function detectDialect(text) {
+  const tl = text.toLowerCase();
+  if (/ఏంది|గని|బిడ్డా|చేత్తాండు|kadapa|kurnool/.test(tl)) return 'rayalaseema';
+  if (/గదరా|అంట|ఏంటే|ఒరేయ్|vizag|kakinada/.test(tl))      return 'godavari';
+  if (/క్యా|యార్|బోలో|hyderabad|bhai/.test(tl))            return 'hyderabadi';
+  if (/ఏంరా|సర్లే రా|మామా|warangal/.test(tl))             return 'telangana';
+  return 'neutral';
+}
+
+// ═══════════════════════════════════════════
+//  5. PIPELINE ANIMATOR
+// ═══════════════════════════════════════════
+const STEPS = ['input','rag','prompt','llm','emotion','world','ui'];
+let pipeTimer = null;
+
+function resetPipeline() {
+  STEPS.forEach(s => {
+    const el = document.getElementById('ps-'+s);
+    if (el) { el.classList.remove('active','done'); }
+  });
+}
+
+async function animatePipeline(steps) {
+  resetPipeline();
+  for (let i = 0; i < steps.length; i++) {
+    await new Promise(r => setTimeout(r, 280));
+    const el = document.getElementById('ps-'+steps[i]);
+    if (!el) continue;
+    // Mark previous as done
+    if (i > 0) {
+      const prev = document.getElementById('ps-'+steps[i-1]);
+      if (prev) { prev.classList.remove('active'); prev.classList.add('done'); }
+    }
+    el.classList.add('active');
+  }
+  // Final step done
+  await new Promise(r => setTimeout(r, 300));
+  const last = document.getElementById('ps-'+steps[steps.length-1]);
+  if (last) { last.classList.remove('active'); last.classList.add('done'); }
+}
+
+// ═══════════════════════════════════════════
+//  6. EXPERIENCE ENGINE (POST-PROCESSING)
+// ═══════════════════════════════════════════
+function applyExperience(response, emotion, world, ragContext) {
+  // Show response card
+  const card = document.getElementById('response-card');
+  const worldLabels = { science:'🧬 Science World',fun:'🌈 Fun World',space:'🌌 Space World',spiritual:'🕉️ Spiritual World',default:'✨ SIA Response' };
+  document.getElementById('response-world-label').textContent = worldLabels[world] || worldLabels.default;
+  document.getElementById('response-text').textContent = response;
+  document.getElementById('response-rag-tag').textContent = ragContext
+    ? `⚡ RAG: Retrieved from "${ragContext.topic}" knowledge base`
+    : '';
+  card.classList.remove('show');
+  void card.offsetWidth;
+  setTimeout(() => { card.classList.add('show'); setTimeout(() => card.classList.remove('show'), 6000); }, 100);
+
+  // Apply world shift
+  if (mode === 'reality' || mode === 'auto') shiftWorld(world);
+
+  // Apply emotion to particles
+  applyEmotionToParticles(emotion);
+
+  // Echo layer
+  if (mode === 'echo' || mode === 'auto') spawnEchoWords(world);
+
+  // Living sentence
+  if (mode === 'living' || mode === 'auto') {
+    setTimeout(() => buildLivingSentence(response), 800);
+  }
+
+  // Explode particles
+  particles.forEach(p => {
+    const a = Math.random() * Math.PI * 2, s = 2 + Math.random() * 5;
+    p.vx += Math.cos(a) * s; p.vy += Math.sin(a) * s;
+  });
+
+  // Spawn world-colored particles
+  const worldCols = { science:'#00FF88',fun:'#FF2D7A',space:'#4488FF',spiritual:'#9D4EDD',default:'#FF6B35' };
+  const col = worldCols[world] || worldCols.default;
+  for (let i = 0; i < 6; i++) {
+    setTimeout(() => {
+      const wd = WORD_DATA[Math.floor(Math.random()*WORD_DATA.length)];
+      particles.push(new Particle(
+        W*.2+Math.random()*W*.6,
+        H*.2+Math.random()*H*.6,
+        wd, { col, dec:.004, important:true }
+      ));
+    }, i * 150);
+  }
+}
+
+// ═══════════════════════════════════════════
+//  MAIN PIPELINE ORCHESTRATOR
+// ═══════════════════════════════════════════
+async function run(query) {
+  if (!query || query.trim() === '') return;
+
+  showLoading('Processing query...');
+
+  // Step 1 — Input detection (instant)
+  animatePipeline(['input']);
+  await delay(200);
+
+  // Step 2 — RAG Retrieval
+  setLoadingText('Retrieving context (RAG)...');
+  animatePipeline(['input','rag']);
+  const ragContext = retrieveContext(query);
+  await delay(300);
+
+  // Step 3 — Prompt Engineering
+  setLoadingText('Building prompt...');
+  animatePipeline(['input','rag','prompt']);
+  const emotion  = detectEmotion(query);
+  const world    = detectWorld(query);
+  const dialect  = detectDialect(query);
+  const sysPrompt= buildSystemPrompt(emotion, world, dialect);
+  await delay(250);
+
+  // Step 4 — LLM Call
+  setLoadingText('Calling LLM...');
+  animatePipeline(['input','rag','prompt','llm']);
+  const response = await callLLM(query, ragContext, sysPrompt);
+  await delay(200);
+
+  // Step 5 — Emotion Processing
+  setLoadingText('Emotion mapping...');
+  animatePipeline(['input','rag','prompt','llm','emotion']);
+  await delay(200);
+
+  // Step 6 — World Detection
+  setLoadingText('World detection...');
+  animatePipeline(['input','rag','prompt','llm','emotion','world']);
+  await delay(200);
+
+  // Step 7 — UX Layer
+  setLoadingText('Rendering experience...');
+  animatePipeline(['input','rag','prompt','llm','emotion','world','ui']);
+  hideLoading();
+
+  // Apply full experience
+  applyExperience(response, emotion, world, ragContext);
+}
+
+// ═══════════════════════════════════════════
+//  CANVAS + PARTICLE SYSTEM
+// ═══════════════════════════════════════════
+const cv  = document.getElementById('c');
+const ctx = cv.getContext('2d');
+const emCv = document.getElementById('emotion-ring');
+const emCtx= emCv.getContext('2d');
+const cur  = document.getElementById('cur');
+const crd  = document.getElementById('cur-dot');
+
+let W = cv.width = window.innerWidth;
+let H = cv.height= window.innerHeight;
+const M = {x:W/2,y:H/2,px:W/2,py:H/2,vx:0,vy:0,down:false};
+let mode='gravity',currentWorld='default',frame=0;
+let particles=[],score=0,streak=0,streakTimer=null,comboTimer=null;
+let blackHoleActive=false,bhX=W/2,bhY=H/2;
+
+const WORD_DATA=[
+  {w:"చదువు",  col:"#FFD700",pts:10,m:"Education!"},
+  {w:"గెలుపు", col:"#FF9500",pts:15,m:"Victory!"},
+  {w:"ఆశ",     col:"#FFB300",pts:10,m:"Hope!"},
+  {w:"కల",     col:"#FF8C00",pts:10,m:"Dream big!"},
+  {w:"శక్తి",  col:"#FF6B35",pts:12,m:"Power!"},
+  {w:"విజయం", col:"#FFD700",pts:15,m:"Success!"},
+  {w:"ఓం",     col:"#FF2D7A",pts:25,m:"Om — Sacred!"},
+  {w:"శాంతి",  col:"#9D4EDD",pts:15,m:"Peace!"},
+  {w:"SIA",    col:"#FFD700",pts:30,m:"Your companion!"},
+  {w:"బ్రో!",  col:"#00FFD4",pts:5, m:"Friend!"},
+  {w:"మస్తు!", col:"#00FF88",pts:5, m:"Fantastic!"},
+  {w:"🔥",     col:"#FF4500",pts:8, m:"Passion!"},
+  {w:"⭐",     col:"#FFD700",pts:8, m:"Star!"},
+  {w:"💪",     col:"#FF6B35",pts:8, m:"Strong!"},
+  {w:"🚀",     col:"#4488FF",pts:15,m:"Sky is the limit!"},
+  {w:"DNA",    col:"#00FFD4",pts:12,m:"Life's code!"},
+  {w:"🧬",     col:"#00FF88",pts:10,m:"Biology!"},
+  {w:"తెలుగు", col:"#FFD700",pts:20,m:"82M speakers!"},
+  {w:"ధైర్యం", col:"#FF9500",pts:12,m:"Courage!"},
+  {w:"🌌",     col:"#4488FF",pts:12,m:"Universe!"},
+];
+
+const EMOTION_COLS={neutral:"#FFD700",happy:"#00FF88",sad:"#4488FF",angry:"#FF0000",tired:"#888",calm:"#9D4EDD",excited:"#FF6B35"};
+
+class Particle {
+  constructor(x,y,wd,o={}){
+    this.x=x??Math.random()*W; this.y=y??Math.random()*H;
+    this.wd=wd??WORD_DATA[~~(Math.random()*WORD_DATA.length)];
+    this.sz=o.sz??(12+Math.random()*22);
+    this.col=o.col??this.wd.col;
+    this.vx=o.vx??(Math.random()-.5)*4; this.vy=o.vy??(Math.random()-.5)*4;
+    this.rot=Math.random()*Math.PI*2; this.rs=(Math.random()-.5)*.07;
+    this.a=0; this.ta=.5+Math.random()*.45;
+    this.life=1; this.dec=o.dec??0;
+    this.pulse=Math.random()*Math.PI*2; this.wob=Math.random()*Math.PI*2;
+    this.trail=[]; this.glow=false; this.hue=Math.random()*360;
+    this.important=o.important??Math.random()>.65;
+  }
+  hit(px,py){const dx=px-this.x,dy=py-this.y;return Math.sqrt(dx*dx+dy*dy)<this.sz*.9;}
+  update(){
+    if(this.a<this.ta) this.a=Math.min(this.a+.025,this.ta);
+    this.trail.push({x:this.x,y:this.y,a:this.a*.15});
+    if(this.trail.length>8) this.trail.shift();
+    this.pulse+=.05; this.wob+=.025; this.rot+=this.rs; this.hue+=.6;
+    if(blackHoleActive){
+      const dx=bhX-this.x,dy=bhY-this.y,d=Math.sqrt(dx*dx+dy*dy)||1;
+      const pull=5000/(d*d+400);
+      this.vx+=(dx/d)*pull*.2; this.vy+=(dy/d)*pull*.2;
+      if(d<15) this.life=0;
+    } else if(this.important){
+      this.vy-=.028; this.vx+=Math.sin(this.wob)*.03;
+    } else {
+      this.vy+=.008; this.vx+=Math.sin(this.wob+1)*.02;
+    }
+    const dx=this.x-M.x,dy=this.y-M.y,d=Math.sqrt(dx*dx+dy*dy)||1;
+    if(M.down&&d<150){this.vx-=(dx/d)*2.8;this.vy-=(dy/d)*2.8;this.glow=true;}
+    else if(d<80){this.vx+=(dx/d)*.75;this.vy+=(dy/d)*.75;this.glow=d<45;}
+    else this.glow=false;
+    this.x+=this.vx; this.y+=this.vy; this.vx*=.97; this.vy*=.97;
+    if(!blackHoleActive){
+      if(this.x<8){this.x=8;this.vx=Math.abs(this.vx)*.6;}
+      if(this.x>W-8){this.x=W-8;this.vx=-Math.abs(this.vx)*.6;}
+      if(this.y<8){this.y=8;this.vy=Math.abs(this.vy)*.6;}
+      if(this.y>H-8){this.y=H-8;this.vy=-Math.abs(this.vy)*.6;}
+    }
+    if(this.dec>0){this.life-=this.dec;this.a=this.life*this.ta;}
+    return this.life>.02;
+  }
+  draw(){
+    this.trail.forEach((t,i)=>{
+      const f=i/this.trail.length;
+      ctx.save();ctx.globalAlpha=t.a*f*.35;ctx.fillStyle=this.col;
+      ctx.shadowBlur=5;ctx.shadowColor=this.col;
+      ctx.font=(this.sz*.55)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(this.wd.w,t.x,t.y);ctx.restore();
+    });
+    ctx.save();ctx.translate(this.x,this.y);ctx.rotate(this.rot);
+    const sc=1+Math.sin(this.pulse)*.1;ctx.scale(sc,sc);
+    const dc=mode==='emotion'?`hsl(${this.hue%360},100%,65%)`:this.col;
+    ctx.shadowBlur=this.glow?50:this.important?18:10;
+    ctx.shadowColor=this.glow?'#FFD700':dc;
+    ctx.globalAlpha=this.a;ctx.fillStyle=dc;
+    ctx.font=(this.important?'bold ':'')+this.sz+'px serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(this.wd.w,0,0);
+    if(this.glow){
+      ctx.fillStyle='#FFD700';ctx.shadowColor='#FFD700';ctx.shadowBlur=20;
+      ctx.font=(this.sz*.28)+'px Space Mono';
+      ctx.fillText('+'+this.wd.pts,this.sz*.6,-this.sz*.55);
+    }
+    ctx.restore();
+  }
+}
+
+// World System
+const WORLDS={science:{col:'#00FF88'},fun:{col:'#FF2D7A'},space:{col:'#4488FF'},spiritual:{col:'#9D4EDD'},default:{col:'#FF6B35'}};
+function shiftWorld(world){
+  if(currentWorld===world) return;
+  currentWorld=world;
+  const col=WORLDS[world]?.col||'#FF6B35';
+  document.documentElement.style.setProperty('--accent',col);
+  document.body.className='world-'+world==='world-default'?'':('world-'+world);
+  // Flash
+  const fl=document.createElement('div');
+  fl.className='world-flash';fl.style.background=col;
+  document.body.appendChild(fl);setTimeout(()=>fl.remove(),600);
+  ripple(W/2,H/2,col);
+  particles.forEach(p=>{p.col=col;const a=Math.random()*Math.PI*2,s=2+Math.random()*5;p.vx+=Math.cos(a)*s;p.vy+=Math.sin(a)*s;});
+}
+
+// Emotion system
+function applyEmotionToParticles(emotion){
+  const col=EMOTION_COLS[emotion]||'#FFD700';
+  document.getElementById('emotion-label').textContent=emotion;
+  drawEmotionRing(emotion,col);
+  particles.forEach((p,i)=>{
+    setTimeout(()=>{
+      p.col=col;
+      if(emotion==='excited'||emotion==='happy'){p.vy-=3+Math.random()*4;}
+      if(emotion==='tired'){p.vx*=.15;p.vy=.4;p.rs*=.1;}
+      if(emotion==='angry'){p.vx=(Math.random()-.5)*12;p.rs*=2.5;}
+      if(emotion==='calm'){p.vx*=.2;p.vy*=.2;}
+    },i*15);
+  });
+}
+
+function drawEmotionRing(emotion,col){
+  col=col||EMOTION_COLS[emotion]||'#FFD700';
+  emCtx.clearRect(0,0,50,50);
+  emCtx.strokeStyle='#ffffff11';emCtx.lineWidth=3;
+  emCtx.beginPath();emCtx.arc(25,25,20,0,Math.PI*2);emCtx.stroke();
+  emCtx.strokeStyle=col;emCtx.lineWidth=3;emCtx.lineCap='round';
+  emCtx.shadowBlur=12;emCtx.shadowColor=col;
+  emCtx.beginPath();emCtx.arc(25,25,20,-Math.PI/2,Math.PI*1.5);emCtx.stroke();
+  emCtx.fillStyle=col;emCtx.shadowBlur=15;
+  emCtx.beginPath();emCtx.arc(25,25,5,0,Math.PI*2);emCtx.fill();
+}
+
+// Echo words
+const ECHO_WORDS={
+  science:["atoms","DNA","cells","molecules","energy","evolution","neurons"],
+  fun:["మస్తు","వావ్","cool","bro","fire","vibe","lit"],
+  space:["galaxies","cosmos","orbits","infinity","nebula","quasar"],
+  spiritual:["శాంతి","ఓం","karma","moksha","bhakti","dharma","ప్రేమ"],
+  default:["చదువు","గెలుపు","ఆశ","SIA","తెలుగు","విజయం","శక్తి"]
+};
+function spawnEchoWords(world){
+  const words=ECHO_WORDS[world]||ECHO_WORDS.default;
+  const layer=document.getElementById('echo-layer');
+  const col=WORLDS[world]?.col||'#FFD700';
+  for(let i=0;i<7;i++){
+    setTimeout(()=>{
+      const el=document.createElement('div');
+      el.className='echo-word';
+      el.textContent=words[~~(Math.random()*words.length)];
+      el.style.cssText=`left:${W*.08+Math.random()*W*.84}px;top:${H*.15+Math.random()*H*.65}px;font-size:${11+Math.random()*18}px;color:${col};animation-delay:${i*.12}s;`;
+      layer.appendChild(el);
+      setTimeout(()=>el.remove(),2800+i*120);
+    },i*80);
+  }
+}
+
+// Living sentence
+function buildLivingSentence(text){
+  const area=document.getElementById('sentence-area');
+  area.style.display='block';area.innerHTML='';
+  text.split(/\s+/).filter(w=>w).forEach((word,i)=>{
+    const t=document.createElement('span');
+    t.className='word-token';t.textContent=word;area.appendChild(t);
+    setTimeout(()=>t.classList.add('born'),i*110+80);
+  });
+  setTimeout(()=>{area.style.display='none';},5500);
+}
+
+// Score system
+function addScore(wd,x,y){
+  const pts=wd.pts*(streak>2?2:1);score+=pts;
+  document.getElementById('score-val').textContent=score;
+  streak++;clearTimeout(streakTimer);
+  streakTimer=setTimeout(()=>{streak=0;document.getElementById('streak-el').textContent='';},2000);
+  if(streak>=3){document.getElementById('streak-el').textContent=`🔥 ${streak}x`;showCombo(`${streak}x COMBO! 🔥`);}
+  const pop=document.createElement('div');
+  pop.className='score-pop';
+  pop.style.cssText=`left:${x}px;top:${y-15}px;color:${wd.col};text-shadow:0 0 12px ${wd.col};`;
+  pop.textContent=`+${pts} ${wd.m}`;
+  document.body.appendChild(pop);setTimeout(()=>pop.remove(),800);
+  ripple(x,y,wd.col);
+}
+
+function showCombo(text){
+  const el=document.getElementById('combo-el');
+  el.textContent=text;el.classList.add('show');
+  clearTimeout(comboTimer);comboTimer=setTimeout(()=>el.classList.remove('show'),1500);
+}
+
+// Black hole
+function triggerBlackHole(x,y){
+  blackHoleActive=true;bhX=x;bhY=y;
+  ripple(x,y,'#FF2D7A');showCombo('⚫ BLACK HOLE!');
+  setTimeout(()=>{blackHoleActive=false;setTimeout(()=>spawn(14),600);},2800);
+}
+
+function drawBHfx(){
+  for(let i=5;i>0;i--){
+    const r=12+i*14,g=ctx.createRadialGradient(bhX,bhY,r*.3,bhX,bhY,r);
+    g.addColorStop(0,`hsla(${frame*3+i*25},100%,60%,.22)`);g.addColorStop(1,'transparent');
+    ctx.beginPath();ctx.arc(bhX,bhY,r,0,Math.PI*2);ctx.fillStyle=g;ctx.fill();
+  }
+  ctx.beginPath();ctx.arc(bhX,bhY,14,0,Math.PI*2);ctx.fillStyle='#000';ctx.fill();
+  ctx.beginPath();ctx.arc(bhX,bhY,14,0,Math.PI*2);
+  ctx.strokeStyle=`hsla(${frame*4},100%,70%,.9)`;ctx.lineWidth=2;ctx.shadowBlur=18;ctx.shadowColor='#FF2D7A';ctx.stroke();ctx.shadowBlur=0;
+}
+
+function spawn(n=14){for(let i=0;i<n;i++)setTimeout(()=>particles.push(new Particle()),i*90);}
+
+function ripple(x,y,col='#FFD700'){
+  const r=document.createElement('div');r.className='rip';
+  r.style.cssText=`left:${x}px;top:${y}px;border-color:${col};`;
+  document.body.appendChild(r);setTimeout(()=>r.remove(),700);
+}
+
+function setMode(m){
+  mode=m;
+  document.querySelectorAll('.btn').forEach(b=>b.classList.remove('on'));
+  document.getElementById('b-'+m)?.classList.add('on');
+  const labels={gravity:'🌀 GRAVITY',echo:'🌊 ECHO',emotion:'🎭 EMOTION',living:'🧬 LIVING',combo:'🎮 COMBO',reality:'🌌 REALITY',auto:'🚀 AUTO'};
+  document.getElementById('mode-label').textContent=labels[m]||m.toUpperCase();
+  if(m==='combo') showCombo('🎮 Click words for points!');
+}
+
+// Word click detection
+function checkWordClick(x,y){
+  for(let i=particles.length-1;i>=0;i--){
+    if(particles[i].hit(x,y)){
+      const p=particles[i]; addScore(p.wd,x,y); p.dec=.022;
+      for(let j=0;j<5;j++){
+        const a=Math.PI*2*j/5,s=3+Math.random()*5;
+        particles.push(new Particle(p.x,p.y,p.wd,{vx:Math.cos(a)*s,vy:Math.sin(a)*s,sz:p.sz*.45,dec:.025}));
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
+let pt=0;
+function paintWord(){
+  pt++;if(pt%4!==0) return;
+  const spd=Math.sqrt(M.vx**2+M.vy**2);
+  if(spd>11) particles.push(new Particle(M.x,M.y,WORD_DATA[~~(Math.random()*WORD_DATA.length)],{sz:8+spd*.28,vx:M.vx*.14+(Math.random()-.5)*2,vy:M.vy*.14+(Math.random()-.5)*2,dec:.018}));
+}
+
+// Background
+function drawBg(){
+  ctx.fillStyle='rgba(4,2,12,.13)';ctx.fillRect(0,0,W,H);
+  const g=ctx.createRadialGradient(M.x,M.y,0,M.x,M.y,240);
+  const acol=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#FF6B35';
+  g.addColorStop(0,acol+'09');g.addColorStop(1,'transparent');
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  if(currentWorld==='space'){
+    for(let i=0;i<2;i++){const sx=(frame*1.2+i*113)%W,sy=(i*157+80)%H;ctx.fillStyle='rgba(120,160,255,.08)';ctx.beginPath();ctx.arc(sx,sy,1,0,Math.PI*2);ctx.fill();}
+  }
+  if(currentWorld==='science'){
+    ctx.strokeStyle='rgba(0,255,136,.015)';ctx.lineWidth=1;
+    for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+    for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  }
+  if(blackHoleActive) drawBHfx();
+}
+
+// Main loop
+function loop(){
+  frame++;drawBg();
+  particles=particles.filter(p=>p.update());
+  particles.forEach(p=>p.draw());
+  if(particles.length<10) spawn(6);
+  requestAnimationFrame(loop);
+}
+
+// UI helpers
+function showLoading(text){
+  const el=document.getElementById('loading-el');
+  document.getElementById('loading-text').textContent=text;
+  el.classList.add('show');
+}
+function hideLoading(){document.getElementById('loading-el').classList.remove('show');}
+function setLoadingText(t){document.getElementById('loading-text').textContent=t;}
+function delay(ms){return new Promise(r=>setTimeout(r,ms));}
+
+// Events
+document.addEventListener('mousemove',e=>{
+  M.vx=e.clientX-M.px;M.vy=e.clientY-M.py;M.px=M.x;M.py=M.y;M.x=e.clientX;M.y=e.clientY;
+  cur.style.left=(e.clientX-9)+'px';cur.style.top=(e.clientY-9)+'px';
+  crd.style.left=(e.clientX-1.5)+'px';crd.style.top=(e.clientY-1.5)+'px';
+  if(M.down) paintWord();
+});
+document.addEventListener('mousedown',e=>{
+  M.down=true;cur.classList.add('active');
+  if(e.target.closest('#dock')||e.target.closest('#input-wrap')) return;
+  if(!checkWordClick(e.clientX,e.clientY)){
+    ripple(e.clientX,e.clientY);
+    particles.forEach(p=>{const dx=p.x-e.clientX,dy=p.y-e.clientY,d=Math.sqrt(dx*dx+dy*dy)||1;if(d<180){const f=(180-d)/180*9;p.vx+=(dx/d)*f;p.vy+=(dy/d)*f;}});
+  }
+});
+document.addEventListener('mouseup',()=>{M.down=false;cur.classList.remove('active');});
+document.addEventListener('contextmenu',e=>{e.preventDefault();if(!e.target.closest('#dock')&&!e.target.closest('#input-wrap'))triggerBlackHole(e.clientX,e.clientY);});
+document.getElementById('query-box').addEventListener('keydown',e=>{if(e.key==='Enter'){const q=e.target.value.trim();if(q){run(q);e.target.value='';}}});
+document.addEventListener('touchstart',e=>{if(e.target.closest('#dock')||e.target.closest('#input-wrap'))return;e.preventDefault();const t=e.touches[0];M.x=t.clientX;M.y=t.clientY;M.down=true;if(!checkWordClick(t.clientX,t.clientY))ripple(t.clientX,t.clientY);},{passive:false});
+document.addEventListener('touchmove',e=>{e.preventDefault();const t=e.touches[0];M.vx=t.clientX-M.x;M.vy=t.clientY-M.y;M.x=t.clientX;M.y=t.clientY;paintWord();},{passive:false});
+document.addEventListener('touchend',()=>M.down=false);
+document.addEventListener('keydown',e=>{if(e.code==='Space'&&e.target!==document.getElementById('query-box')){e.preventDefault();triggerBlackHole(W/2,H/2);}});
+window.addEventListener('resize',()=>{W=cv.width=window.innerWidth;H=cv.height=window.innerHeight;});
+
+// Start
+spawn(20);
+loop();
+drawEmotionRing('neutral','#FFD700');
+setTimeout(()=>showCombo('🕉️ SIA GenAI Pipeline Ready!'),600);
+</script>
+</body>
+</html>
