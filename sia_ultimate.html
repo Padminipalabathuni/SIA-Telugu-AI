@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="te">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIA — Ultimate Mode Engine</title>
+<link href="https://fonts.googleapis.com/css2?family=Tiro+Telugu&family=Outfit:wght@200;400;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+
+/* ── CSS Variables per world ── */
+:root{
+  --bg:#04020C;--surface:#0A0818;--border:#1A1430;
+  --gold:#FFD700;--fire:#FF6B35;--text:#F0EAF8;--muted:#6A5A8A;
+  --accent:#FF6B35;
+  transition:all .8s ease;
+}
+body.world-science{--bg:#020A04;--surface:#061008;--border:#0A2010;--accent:#00FF88;}
+body.world-fun{--bg:#0A0204;--surface:#180408;--border:#300810;--accent:#FF2D7A;}
+body.world-space{--bg:#000204;--surface:#020408;--border:#040820;--accent:#4488FF;}
+body.world-spiritual{--bg:#08040A;--surface:#100618;--border:#200A30;--accent:#9D4EDD;}
+
+body{
+  background:var(--bg);color:var(--text);
+  font-family:'Outfit',sans-serif;
+  width:100vw;height:100vh;overflow:hidden;
+  cursor:none;transition:background 1s ease;
+}
+
+/* ── Custom Cursor ── */
+#cur{position:fixed;width:20px;height:20px;border:1.5px solid var(--gold);border-radius:50%;pointer-events:none;z-index:9999;mix-blend-mode:screen;transition:transform .08s,border-color .3s;}
+#cur.active{transform:scale(2.5);border-color:var(--accent);}
+#cur-dot{position:fixed;width:3px;height:3px;background:var(--gold);border-radius:50%;pointer-events:none;z-index:9999;}
+
+/* ── Main Canvas ── */
+canvas#bg{position:fixed;top:0;left:0;z-index:0;}
+canvas#fg{position:fixed;top:0;left:0;z-index:5;pointer-events:none;}
+
+/* ── UI Layer ── */
+#ui{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;pointer-events:none;}
+
+/* ── Header ── */
+#header{padding:1.5rem 2rem .5rem;display:flex;justify-content:space-between;align-items:flex-start;}
+.logo{font-family:'Tiro Telugu',serif;font-size:2.2rem;background:linear-gradient(135deg,var(--fire),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:5px;animation:shimmer 4s linear infinite;background-size:200%;}
+@keyframes shimmer{0%{background-position:0%}100%{background-position:200%}}
+.logo-sub{color:var(--muted);font-size:.55rem;letter-spacing:4px;text-transform:uppercase;}
+
+/* ── Mode Badge ── */
+#mode-badge{
+  display:inline-flex;align-items:center;gap:.4rem;
+  padding:.4rem 1rem;border-radius:20px;
+  border:1px solid var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);
+  color:var(--accent);font-size:.6rem;letter-spacing:3px;text-transform:uppercase;
+  font-family:'Space Mono',monospace;transition:all .5s;
+}
+.mode-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 1.5s infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(1.5);}}
+
+/* ── Input Area ── */
+#input-area{
+  position:fixed;bottom:5rem;left:50%;transform:translateX(-50%);
+  width:min(600px,90vw);pointer-events:all;
+  display:flex;flex-direction:column;gap:.6rem;
+}
+#query-input{
+  width:100%;padding:.9rem 1.2rem;
+  background:rgba(10,8,24,.9);
+  border:1px solid var(--border);border-radius:14px;
+  color:var(--text);font-family:'Outfit',sans-serif;font-size:.9rem;
+  outline:none;backdrop-filter:blur(20px);
+  transition:border-color .3s,box-shadow .3s;
+}
+#query-input:focus{border-color:var(--accent);box-shadow:0 0 30px color-mix(in srgb,var(--accent) 20%,transparent);}
+#query-input::placeholder{color:var(--muted);}
+
+.quick-chips{display:flex;gap:.4rem;flex-wrap:wrap;justify-content:center;}
+.chip{
+  padding:4px 12px;border-radius:20px;font-size:.6rem;letter-spacing:1px;
+  cursor:pointer;border:1px solid var(--border);color:var(--muted);
+  background:rgba(10,8,24,.7);transition:all .2s;pointer-events:all;
+  font-family:'Space Mono',monospace;
+}
+.chip:hover{border-color:var(--accent);color:var(--accent);}
+
+/* ── Mode Dock ── */
+#dock{
+  position:fixed;bottom:1.2rem;left:50%;transform:translateX(-50%);
+  display:flex;gap:.5rem;z-index:20;pointer-events:all;flex-wrap:wrap;justify-content:center;
+  max-width:95vw;
+}
+.mode-btn{
+  background:rgba(10,8,24,.8);border:1px solid var(--border);
+  color:var(--muted);padding:6px 14px;border-radius:6px;
+  font-size:.58rem;letter-spacing:2px;cursor:pointer;text-transform:uppercase;
+  font-family:'Space Mono',monospace;transition:all .2s;backdrop-filter:blur(10px);
+}
+.mode-btn:hover,.mode-btn.on{border-color:var(--accent);color:var(--accent);box-shadow:0 0 15px color-mix(in srgb,var(--accent) 30%,transparent);}
+
+/* ── Response Display ── */
+#response-area{
+  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:min(600px,88vw);pointer-events:none;text-align:center;
+  z-index:15;
+}
+#main-response{
+  font-family:'Tiro Telugu',serif;font-size:1.1rem;line-height:1.7;
+  color:var(--text);opacity:0;transition:opacity .5s;
+  text-shadow:0 0 30px color-mix(in srgb,var(--accent) 40%,transparent);
+}
+#main-response.show{opacity:1;}
+
+/* ── Thought Echo ── */
+#echo-layer{position:fixed;inset:0;pointer-events:none;z-index:8;}
+.echo-word{
+  position:absolute;font-family:'Tiro Telugu',serif;
+  pointer-events:none;animation:echoFade 3s ease-out forwards;
+  white-space:nowrap;
+}
+@keyframes echoFade{0%{opacity:.6;transform:scale(1);}100%{opacity:0;transform:scale(1.5) translateY(-30px);}}
+
+/* ── Living Sentence ── */
+#sentence-area{
+  position:fixed;top:45%;left:50%;transform:translate(-50%,-50%);
+  width:min(700px,92vw);text-align:center;z-index:15;pointer-events:none;
+  display:none;
+}
+.word-token{
+  display:inline-block;margin:4px;
+  font-family:'Tiro Telugu',serif;font-size:1.1rem;
+  padding:4px 10px;border-radius:8px;
+  border:1px solid var(--accent);
+  color:var(--text);
+  opacity:0;transform:translateY(20px) scale(.8);
+  transition:all .4s cubic-bezier(.34,1.56,.64,1);
+  background:color-mix(in srgb,var(--accent) 8%,transparent);
+}
+.word-token.born{opacity:1;transform:translateY(0) scale(1);}
+.word-token:hover{transform:translateY(-5px) scale(1.1);border-color:var(--gold);}
+
+/* ── Combo System ── */
+#combo-display{
+  position:fixed;top:5rem;left:50%;transform:translateX(-50%);
+  font-family:'Outfit',sans-serif;font-weight:900;font-size:1.8rem;
+  color:var(--gold);text-shadow:0 0 30px var(--gold);
+  pointer-events:none;z-index:500;opacity:0;transition:opacity .3s;
+  letter-spacing:3px;
+}
+#combo-display.show{opacity:1;}
+#score-display{
+  position:fixed;top:1.5rem;right:2rem;text-align:right;pointer-events:none;z-index:100;
+}
+#score-val{font-family:'Outfit',sans-serif;font-weight:900;font-size:2rem;color:var(--gold);line-height:1;}
+#score-sub{color:var(--muted);font-size:.55rem;letter-spacing:2px;text-transform:uppercase;}
+#streak-display{color:var(--fire);font-size:.65rem;letter-spacing:1px;}
+
+/* Score popup */
+.score-pop{position:fixed;pointer-events:none;z-index:600;font-family:'Outfit',sans-serif;font-weight:700;animation:scoreUp .9s ease-out forwards;}
+@keyframes scoreUp{0%{opacity:1;transform:translateY(0) scale(1);}100%{opacity:0;transform:translateY(-60px) scale(1.5);}}
+
+/* ── Emotion Indicator ── */
+#emotion-ring{
+  position:fixed;top:1.5rem;left:2rem;
+  width:50px;height:50px;pointer-events:none;z-index:100;
+}
+#emotion-label{position:fixed;top:5rem;left:1rem;font-size:.55rem;letter-spacing:2px;color:var(--muted);text-transform:uppercase;pointer-events:none;}
+
+/* ── World Transition overlay ── */
+#world-overlay{
+  position:fixed;inset:0;z-index:1000;pointer-events:none;
+  background:radial-gradient(circle at center,var(--accent),transparent);
+  opacity:0;transition:opacity .3s;
+}
+#world-overlay.flash{opacity:.3;animation:worldFlash .6s ease-out forwards;}
+@keyframes worldFlash{0%{opacity:.4;}100%{opacity:0;}}
+
+/* ── Scan + Vignette ── */
+#scan{position:fixed;inset:0;pointer-events:none;z-index:400;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.025) 2px,rgba(0,0,0,.025) 4px);}
+#vig{position:fixed;inset:0;pointer-events:none;z-index:2;background:radial-gradient(ellipse at center,transparent 35%,rgba(4,2,12,.7) 100%);}
+
+/* Ripple */
+.rip{position:fixed;border-radius:50%;border:1.5px solid var(--gold);pointer-events:none;animation:ripOut .7s ease-out forwards;z-index:300;mix-blend-mode:screen;}
+@keyframes ripOut{0%{width:0;height:0;opacity:.9;margin:0;}100%{width:200px;height:200px;opacity:0;margin:-100px;}}
+</style>
+</head>
+<body>
+
+<div id="scan"></div>
+<div id="vig"></div>
+<div id="world-overlay"></div>
+<div id="cur"></div>
+<div id="cur-dot"></div>
+
+<canvas id="bg"></canvas>
+<canvas id="fg"></canvas>
+
+<!-- Echo Layer -->
+<div id="echo-layer"></div>
+
+<!-- Living Sentence -->
+<div id="sentence-area" id="sentence-area"></div>
+
+<!-- UI -->
+<div id="ui">
+  <div id="header">
+    <div>
+      <div class="logo">🕉 SIA</div>
+      <div class="logo-sub">Ultimate Mode Engine</div>
+    </div>
+    <div id="mode-badge">
+      <span class="mode-dot"></span>
+      <span id="mode-label">GRAVITY</span>
+    </div>
+  </div>
+</div>
+
+<!-- Score -->
+<div id="score-display">
+  <div id="score-val">0</div>
+  <div id="score-sub">పాయింట్లు</div>
+  <div id="streak-display"></div>
+</div>
+
+<!-- Emotion ring -->
+<canvas id="emotion-ring" width="50" height="50"></canvas>
+<div id="emotion-label">NEUTRAL</div>
+
+<!-- Combo -->
+<div id="combo-display"></div>
+
+<!-- Response -->
+<div id="response-area">
+  <div id="main-response"></div>
+</div>
+
+<!-- Input -->
+<div id="input-area">
+  <input id="query-input" type="text"
+    placeholder="మాట్లాడు SIA తో... (Telugu or English)"
+    autocomplete="off">
+  <div class="quick-chips">
+    <div class="chip" onclick="tryQuery('నేను చాలా tired గా ఉన్నాను')">😴 Tired</div>
+    <div class="chip" onclick="tryQuery('DNA అంటే ఏమిటి?')">🧬 Science</div>
+    <div class="chip" onclick="tryQuery('నేను చాలా happy గా ఉన్నాను!')">😄 Happy</div>
+    <div class="chip" onclick="tryQuery('గ్రహాలు ఎక్కడ ఉన్నాయి?')">🪐 Space</div>
+    <div class="chip" onclick="tryQuery('ఓం శాంతి భక్తి ధర్మం')">🙏 Spiritual</div>
+    <div class="chip" onclick="tryQuery('వావ్ ఇది చాలా cool బ్రో!')">🔥 Fun</div>
+  </div>
+</div>
+
+<!-- Dock -->
+<div id="dock">
+  <button class="mode-btn on" id="b-gravity"  onclick="setMode('gravity')"><span>🌀 Gravity</span></button>
+  <button class="mode-btn"    id="b-echo"     onclick="setMode('echo')"><span>🌊 Echo</span></button>
+  <button class="mode-btn"    id="b-emotion"  onclick="setMode('emotion')"><span>🎭 Emotion</span></button>
+  <button class="mode-btn"    id="b-living"   onclick="setMode('living')"><span>🧬 Living</span></button>
+  <button class="mode-btn"    id="b-combo"    onclick="setMode('combo')"><span>🎮 Combo</span></button>
+  <button class="mode-btn"    id="b-reality"  onclick="setMode('reality')"><span>🌌 Reality</span></button>
+  <button class="mode-btn"    id="b-auto"     onclick="setMode('auto')"><span>🚀 AUTO</span></button>
+</div>
+
+<script>
+// ═══════════════════════════════════
+//  CANVAS SETUP
+// ═══════════════════════════════════
+const bgCv = document.getElementById('bg');
+const bgCtx= bgCv.getContext('2d');
+const fgCv = document.getElementById('fg');
+const fgCtx= fgCv.getContext('2d');
+const cur  = document.getElementById('cur');
+const crd  = document.getElementById('cur-dot');
+const emCv = document.getElementById('emotion-ring');
+const emCtx= emCv.getContext('2d');
+
+let W = bgCv.width = fgCv.width = window.innerWidth;
+let H = bgCv.height= fgCv.height= window.innerHeight;
+
+const M = {x:W/2,y:H/2,px:W/2,py:H/2,vx:0,vy:0,down:false};
+let mode='gravity', currentWorld='default';
+let frame=0, score=0, streak=0, streakTimer=null, comboTimer=null;
+let particles=[], blackHoleActive=false, blackHoleX=W/2, blackHoleY=H/2;
+let currentEmotion='neutral', currentSentence=[];
+let lastQuery='';
+
+// ═══════════════════════════════════
+//  WORD DATA
+// ═══════════════════════════════════
+const WORD_DATA=[
+  {w:"చదువు",  cat:"motivate",col:"#FFD700",pts:10,m:"Education — నీ ఆయుధం"},
+  {w:"గెలుపు", cat:"motivate",col:"#FF9500",pts:15,m:"Victory — నువ్వు గెలవగలవు!"},
+  {w:"ఆశ",     cat:"motivate",col:"#FFB300",pts:10,m:"Hope — వదలకు"},
+  {w:"కల",     cat:"motivate",col:"#FF8C00",pts:10,m:"Dream — నిజం చేయి"},
+  {w:"శక్తి",  cat:"spiritual",col:"#FF6B35",pts:12,m:"Power — నీలో ఉంది"},
+  {w:"విజయం", cat:"motivate",col:"#FFD700",pts:15,m:"Success — తప్పదు"},
+  {w:"ఓం",     cat:"spiritual",col:"#FF2D7A",pts:25,m:"Om — సర్వమంగళం"},
+  {w:"శాంతి",  cat:"spiritual",col:"#9D4EDD",pts:15,m:"Peace — మనసులో"},
+  {w:"ప్రేమ",  cat:"spiritual",col:"#FF2D7A",pts:15,m:"Love — జీవితం"},
+  {w:"SIA",    cat:"fun",      col:"#FFD700",pts:30,m:"Your Telugu AI Companion"},
+  {w:"బ్రో!",  cat:"fun",      col:"#00FFD4",pts:5, m:"Best friend call"},
+  {w:"మస్తు!", cat:"fun",      col:"#00FF88",pts:5, m:"Fantastic!"},
+  {w:"🔥",     cat:"emoji",   col:"#FF4500",pts:8, m:"Your passion!"},
+  {w:"⭐",     cat:"emoji",   col:"#FFD700",pts:8, m:"You are a star!"},
+  {w:"💪",     cat:"emoji",   col:"#FF6B35",pts:8, m:"Stay strong!"},
+  {w:"🙏",     cat:"emoji",   col:"#9D4EDD",pts:10,m:"Namaste"},
+  {w:"🚀",     cat:"emoji",   col:"#4488FF",pts:15,m:"Sky is the limit!"},
+  {w:"DNA",    cat:"science", col:"#00FFD4",pts:12,m:"Deoxyribonucleic Acid"},
+  {w:"🧬",     cat:"science", col:"#00FF88",pts:10,m:"Life's blueprint"},
+  {w:"🌌",     cat:"space",   col:"#4488FF",pts:12,m:"The universe"},
+  {w:"🪐",     cat:"space",   col:"#AACCFF",pts:10,m:"Saturn"},
+  {w:"తెలుగు", cat:"culture", col:"#FFD700",pts:20,m:"82 million speakers!"},
+  {w:"ధైర్యం", cat:"motivate",col:"#FF9500",pts:12,m:"Courage — ముందుకు"},
+  {w:"నమ్మకం", cat:"motivate",col:"#FFB300",pts:10,m:"Belief — నిన్ను నువ్వు"},
+];
+
+const EMOTION_COLORS={
+  neutral:"#FFD700", happy:"#00FF88", sad:"#4488FF",
+  excited:"#FF6B35", angry:"#FF0000", calm:"#9D4EDD", tired:"#888888"
+};
+
+// ═══════════════════════════════════
+//  PARTICLE CLASS
+// ═══════════════════════════════════
+class Particle {
+  constructor(x,y,wd,o={}){
+    this.x=x??Math.random()*W; this.y=y??Math.random()*H;
+    this.wd=wd??WORD_DATA[~~(Math.random()*WORD_DATA.length)];
+    this.sz=o.sz??(12+Math.random()*24);
+    this.col=o.col??this.wd.col;
+    this.vx=o.vx??(Math.random()-.5)*4;
+    this.vy=o.vy??(Math.random()-.5)*4;
+    this.rot=Math.random()*Math.PI*2; this.rs=(Math.random()-.5)*.08;
+    this.a=0; this.ta=.5+Math.random()*.45;
+    this.life=1; this.dec=o.dec??0;
+    this.pulse=Math.random()*Math.PI*2;
+    this.wob=Math.random()*Math.PI*2;
+    this.trail=[];
+    this.glow=false; this.hue=Math.random()*360;
+    this.orbitAngle=Math.random()*Math.PI*2;
+    this.orbitR=100+Math.random()*150;
+    this.important=o.important??Math.random()>.7;
+  }
+
+  hit(px,py){
+    const dx=px-this.x,dy=py-this.y;
+    return Math.sqrt(dx*dx+dy*dy)<this.sz*.9;
+  }
+
+  update(){
+    if(this.a<this.ta) this.a=Math.min(this.a+.025,this.ta);
+    this.trail.push({x:this.x,y:this.y,a:this.a*.18});
+    if(this.trail.length>10) this.trail.shift();
+    this.pulse+=.05; this.wob+=.025; this.rot+=this.rs; this.hue+=.6;
+
+    if(blackHoleActive){
+      // All collapse into black hole
+      const dx=blackHoleX-this.x, dy=blackHoleY-this.y;
+      const d=Math.sqrt(dx*dx+dy*dy)||1;
+      const pull=5000/(d*d+500);
+      this.vx+=(dx/d)*pull*.2; this.vy+=(dy/d)*pull*.2;
+      if(d<15){this.life=0;}
+    } else {
+      switch(mode){
+        case 'gravity':
+          // Important words rise, others float
+          if(this.important){
+            this.vy-=.03; // Anti-gravity for important
+            this.vx+=Math.sin(this.wob)*.03;
+          } else {
+            this.vy+=.01; // Others sink slightly
+            this.vx+=Math.sin(this.wob+1)*.02;
+          }
+          break;
+        case 'echo': case 'emotion': case 'combo':
+          this.vy-=.015+Math.sin(this.pulse)*.01;
+          this.vx+=Math.sin(this.wob)*.04;
+          break;
+        case 'living':
+          // Arrange in sentence formation
+          break;
+        case 'reality':
+          this.vy-=.012; this.vx+=Math.sin(this.wob)*.05;
+          break;
+      }
+    }
+
+    // Mouse repel/attract
+    const dx=this.x-M.x, dy=this.y-M.y;
+    const d=Math.sqrt(dx*dx+dy*dy)||1;
+    if(M.down&&d<160){this.vx-=(dx/d)*3;this.vy-=(dy/d)*3;this.glow=true;}
+    else if(d<80){this.vx+=(dx/d)*.8;this.vy+=(dy/d)*.8;this.glow=d<45;}
+    else this.glow=false;
+
+    this.x+=this.vx; this.y+=this.vy;
+    this.vx*=.97; this.vy*=.97;
+
+    if(!blackHoleActive){
+      if(this.x<8){this.x=8;this.vx=Math.abs(this.vx)*.6;}
+      if(this.x>W-8){this.x=W-8;this.vx=-Math.abs(this.vx)*.6;}
+      if(this.y<8){this.y=8;this.vy=Math.abs(this.vy)*.6;}
+      if(this.y>H-8){this.y=H-8;this.vy=-Math.abs(this.vy)*.6;}
+    }
+
+    if(this.dec>0){this.life-=this.dec;this.a=this.life*this.ta;}
+    return this.life>.02;
+  }
+
+  draw(ctx){
+    // Trail
+    for(let i=0;i<this.trail.length;i++){
+      const t=this.trail[i],f=i/this.trail.length;
+      ctx.save();ctx.globalAlpha=t.a*f*.4;
+      ctx.fillStyle=this.col;ctx.shadowBlur=5;ctx.shadowColor=this.col;
+      ctx.font=(this.sz*.55)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(this.wd.w,t.x,t.y);ctx.restore();
+    }
+
+    ctx.save();ctx.translate(this.x,this.y);ctx.rotate(this.rot);
+    const sc=1+Math.sin(this.pulse)*.1; ctx.scale(sc,sc);
+
+    // Emotion color shift
+    const drawCol = mode==='emotion'
+      ? `hsl(${this.hue%360},100%,65%)`
+      : this.col;
+
+    // Important words get extra glow
+    const glowSize = this.important ? (this.glow?60:20) : (this.glow?40:12);
+    ctx.shadowBlur=glowSize;
+    ctx.shadowColor=this.glow?'#FFD700':drawCol;
+    ctx.globalAlpha=this.a;
+    ctx.fillStyle=drawCol;
+    ctx.font=(this.important?'bold ':'')+this.sz+'px serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(this.wd.w,0,0);
+
+    // Points hint on hover
+    if(this.glow){
+      ctx.fillStyle='#FFD700';ctx.shadowColor='#FFD700';ctx.shadowBlur=20;
+      ctx.font=(this.sz*.3)+'px Space Mono';
+      ctx.fillText('+'+this.wd.pts,this.sz*.6,-this.sz*.55);
+    }
+    ctx.restore();
+  }
+}
+
+// ═══════════════════════════════════
+//  WORLD / REALITY SYSTEM
+// ═══════════════════════════════════
+const WORLDS = {
+  science:  {class:'world-science', accent:'#00FF88', bg:'#020A04', label:'🧬 SCIENCE WORLD'},
+  fun:      {class:'world-fun',     accent:'#FF2D7A', bg:'#0A0204', label:'🌈 FUN WORLD'},
+  space:    {class:'world-space',   accent:'#4488FF', bg:'#000204', label:'🌌 SPACE WORLD'},
+  spiritual:{class:'world-spiritual',accent:'#9D4EDD',bg:'#08040A', label:'🕉️ SPIRITUAL WORLD'},
+  default:  {class:'',              accent:'#FF6B35', bg:'#04020C', label:'✦ DEFAULT'}
+};
+
+function detectWorld(text){
+  const tl=text.toLowerCase();
+  if(/dna|cell|atom|science|biology|chemistry|molecule|photosynthesis|protein|జీవ|రసాయన/.test(tl)) return 'science';
+  if(/fun|cool|bro|vibe|happy|excited|wow|party|music|dance|😄|🎉|🔥/.test(tl)) return 'fun';
+  if(/planet|space|star|galaxy|universe|cosmos|నక్షత్రం|గ్రహం|moon|mars|jupiter/.test(tl)) return 'space';
+  if(/om|ॐ|pray|mantra|spiritual|god|bhakti|peace|శాంతి|ఓం|భక్తి|ధర్మం|temple/.test(tl)) return 'spiritual';
+  return 'default';
+}
+
+function shiftWorld(world){
+  if(currentWorld===world) return;
+  currentWorld=world;
+  const data=WORLDS[world];
+
+  // Flash overlay
+  const ov=document.getElementById('world-overlay');
+  ov.classList.remove('flash');
+  void ov.offsetWidth;
+  ov.classList.add('flash');
+
+  // Update CSS variables
+  document.documentElement.style.setProperty('--accent',data.accent);
+
+  // Update body class
+  document.body.className=data.class;
+
+  // Update mode badge color
+  document.getElementById('mode-badge').style.borderColor=data.accent;
+  document.getElementById('mode-badge').style.color=data.accent;
+
+  // Ripple from center
+  ripple(W/2,H/2,data.accent);
+
+  // Respawn particles in world colors
+  setTimeout(()=>{
+    particles.forEach(p=>{
+      p.col=data.accent;
+      const a=Math.random()*Math.PI*2,s=3+Math.random()*8;
+      p.vx=Math.cos(a)*s; p.vy=Math.sin(a)*s;
+    });
+  },200);
+}
+
+// ═══════════════════════════════════
+//  EMOTION DETECTION
+// ═══════════════════════════════════
+function detectEmotion(text){
+  const tl=text.toLowerCase();
+  if(/happy|excited|wow|great|amazing|సంతోషం|చాలా బాగుంది|yayyy/.test(tl)) return 'happy';
+  if(/sad|crying|alone|hurt|దుఃఖం|ఏడుపు|miss|pain/.test(tl)) return 'sad';
+  if(/angry|frustrated|angry|hate|చాలా కోపం/.test(tl)) return 'angry';
+  if(/tired|bore|sleep|నిద్ర|అలసట|బోర్/.test(tl)) return 'tired';
+  if(/calm|peace|relax|శాంతి/.test(tl)) return 'calm';
+  if(/wow|omg|insane|crazy|incredible/.test(tl)) return 'excited';
+  return 'neutral';
+}
+
+function applyEmotionToParticles(emotion){
+  currentEmotion=emotion;
+  const col=EMOTION_COLORS[emotion]||'#FFD700';
+  document.getElementById('emotion-label').textContent=emotion.toUpperCase();
+
+  particles.forEach((p,i)=>{
+    setTimeout(()=>{
+      p.col=col;
+      if(emotion==='excited'){p.vx=(Math.random()-.5)*8;p.vy=(Math.random()-.5)*8;}
+      if(emotion==='calm'){p.vx*=.3;p.vy*=.3;}
+      if(emotion==='angry'){p.vx=(Math.random()-.5)*12;p.rs*=2;}
+      if(emotion==='tired'){p.vx*=.1;p.vy=.5;p.rs*=.1;}
+      if(emotion==='happy'){p.vy-=5+Math.random()*5;}
+    },i*20);
+  });
+
+  drawEmotionRing(emotion);
+}
+
+function drawEmotionRing(emotion){
+  const col=EMOTION_COLORS[emotion]||'#FFD700';
+  emCtx.clearRect(0,0,50,50);
+  // Outer ring
+  emCtx.strokeStyle='#ffffff11';emCtx.lineWidth=3;
+  emCtx.beginPath();emCtx.arc(25,25,20,0,Math.PI*2);emCtx.stroke();
+  // Emotion ring
+  emCtx.strokeStyle=col;emCtx.lineWidth=3;emCtx.lineCap='round';
+  emCtx.shadowBlur=10;emCtx.shadowColor=col;
+  emCtx.beginPath();emCtx.arc(25,25,20,-Math.PI/2,-Math.PI/2+Math.PI*2);emCtx.stroke();
+  // Center
+  emCtx.fillStyle=col;emCtx.shadowBlur=15;
+  emCtx.beginPath();emCtx.arc(25,25,6,0,Math.PI*2);emCtx.fill();
+}
+
+// ═══════════════════════════════════
+//  THOUGHT ECHO MODE
+// ═══════════════════════════════════
+const ECHO_WORDS={
+  science: ["atoms","molecules","DNA","cells","evolution","energy","matter"],
+  fun:     ["మస్తు","వావ్","సూపర్","cool","bro","lit","vibe"],
+  space:   ["నక్షత్రాలు","galaxies","cosmos","infinity","planets","orbits"],
+  spiritual:["శాంతి","ఓం","ధర్మం","ప్రేమ","karma","moksha","bhakti"],
+  default: ["చదువు","గెలుపు","ఆశ","కల","శక్తి","SIA","తెలుగు"]
+};
+
+function spawnEchoWords(world){
+  const words=ECHO_WORDS[world]||ECHO_WORDS.default;
+  const layer=document.getElementById('echo-layer');
+  for(let i=0;i<6;i++){
+    setTimeout(()=>{
+      const el=document.createElement('div');
+      el.className='echo-word';
+      el.textContent=words[~~(Math.random()*words.length)];
+      const x=W*.1+Math.random()*W*.8;
+      const y=H*.2+Math.random()*H*.6;
+      const size=12+Math.random()*20;
+      const col=WORLDS[world]?.accent||'#FFD700';
+      el.style.cssText=`left:${x}px;top:${y}px;font-size:${size}px;color:${col};opacity:0;animation-delay:${i*.15}s;font-family:'Tiro Telugu',serif;`;
+      layer.appendChild(el);
+      setTimeout(()=>el.remove(),3000+i*150);
+    },i*100);
+  }
+}
+
+// ═══════════════════════════════════
+//  LIVING SENTENCE MODE
+// ═══════════════════════════════════
+function buildLivingSentence(text){
+  const area=document.getElementById('sentence-area');
+  area.style.display='block';
+  area.innerHTML='';
+
+  // Split into words
+  const words=text.split(/\s+/).filter(w=>w.length>0);
+
+  words.forEach((word,i)=>{
+    const token=document.createElement('span');
+    token.className='word-token';
+    token.textContent=word;
+    token.title=word;
+    area.appendChild(token);
+
+    setTimeout(()=>{
+      token.classList.add('born');
+    },i*120+100);
+
+    // Hover interaction
+    token.addEventListener('mouseenter',()=>{
+      token.style.transform='translateY(-8px) scale(1.15)';
+    });
+    token.addEventListener('mouseleave',()=>{
+      token.style.transform='';
+    });
+  });
+
+  // Hide after 6 seconds
+  setTimeout(()=>{
+    area.style.display='none';
+  },6000);
+}
+
+// ═══════════════════════════════════
+//  SCORE + COMBO SYSTEM
+// ═══════════════════════════════════
+function addScore(wd,x,y){
+  const pts=wd.pts*(streak>2?2:1);
+  score+=pts;
+  document.getElementById('score-val').textContent=score;
+
+  streak++;
+  clearTimeout(streakTimer);
+  streakTimer=setTimeout(()=>{streak=0;document.getElementById('streak-display').textContent='';},2000);
+
+  const streakEl=document.getElementById('streak-display');
+  if(streak>=3){
+    streakEl.textContent=`🔥 ${streak}x STREAK!`;
+    showCombo(`${streak}x COMBO! 🔥`);
+  }
+
+  // Score popup
+  const pop=document.createElement('div');
+  pop.className='score-pop';
+  pop.style.cssText=`left:${x}px;top:${y-20}px;font-size:1.2rem;color:${wd.col};text-shadow:0 0 15px ${wd.col};`;
+  pop.textContent=`+${pts} ${wd.m.split('—')[0]}`;
+  document.body.appendChild(pop);
+  setTimeout(()=>pop.remove(),900);
+
+  ripple(x,y,wd.col);
+}
+
+function showCombo(text){
+  const el=document.getElementById('combo-display');
+  el.textContent=text;el.classList.add('show');
+  clearTimeout(comboTimer);
+  comboTimer=setTimeout(()=>el.classList.remove('show'),1200);
+}
+
+// ═══════════════════════════════════
+//  QUERY HANDLER
+// ═══════════════════════════════════
+function tryQuery(text){
+  document.getElementById('query-input').value=text;
+  processQuery(text);
+}
+
+function processQuery(text){
+  if(!text.trim()) return;
+  lastQuery=text;
+
+  // Detect world + emotion
+  const world=detectWorld(text);
+  const emotion=detectEmotion(text);
+
+  // Apply emotion to particles
+  applyEmotionToParticles(emotion);
+
+  // Auto mode shifts world
+  if(mode==='auto'||mode==='reality'){
+    shiftWorld(world);
+  }
+
+  // Echo mode — spawn echo words
+  if(mode==='echo'||mode==='auto'){
+    spawnEchoWords(world);
+  }
+
+  // Living sentence mode
+  if(mode==='living'||mode==='auto'){
+    setTimeout(()=>buildLivingSentence(text),500);
+  }
+
+  // Show response animation
+  showResponse(text,world,emotion);
+
+  // Particles react
+  particles.forEach(p=>{
+    const a=Math.random()*Math.PI*2,s=2+Math.random()*5;
+    p.vx+=Math.cos(a)*s; p.vy+=Math.sin(a)*s;
+  });
+
+  // Spawn new words related to query
+  for(let i=0;i<5;i++){
+    setTimeout(()=>{
+      const wd=WORD_DATA[~~(Math.random()*WORD_DATA.length)];
+      const p=new Particle(W*.2+Math.random()*W*.6,H*.3+Math.random()*H*.4,wd,{dec:.005,important:true});
+      particles.push(p);
+    },i*200);
+  }
+}
+
+function showResponse(text,world,emotion){
+  const el=document.getElementById('main-response');
+  const responses={
+    science: "🧬 Science world activated! Facts are forming around you...",
+    fun:     "🌈 Fun mode! SIA is dancing with you! మస్తు!",
+    space:   "🌌 Space mode! Stars are aligning for your answer...",
+    spiritual:"🕉️ Spiritual mode! శాంతి... breathe... SIA is here.",
+    default: "✨ SIA understands. Watch the words respond to you..."
+  };
+
+  const emotionPrefix={
+    happy:"😄 SIA feels your joy! ",sad:"💙 SIA is here with you. ",
+    tired:"😴 Rest a moment... ",excited:"🔥 ",angry:"⚡ SIA hears you. ",
+    calm:"🌿 ",neutral:""
+  };
+
+  el.classList.remove('show');
+  setTimeout(()=>{
+    el.textContent=(emotionPrefix[emotion]||"")+responses[world];
+    el.classList.add('show');
+    setTimeout(()=>el.classList.remove('show'),4000);
+  },200);
+}
+
+// ═══════════════════════════════════
+//  BLACK HOLE
+// ═══════════════════════════════════
+function activateBlackHole(x,y){
+  blackHoleActive=true;
+  blackHoleX=x; blackHoleY=y;
+  ripple(x,y,'#FF2D7A');
+  showCombo("⚫ BLACK HOLE! Everything collapses...");
+
+  // Draw black hole
+  setTimeout(()=>{
+    blackHoleActive=false;
+    // Respawn
+    setTimeout(()=>spawn(15),500);
+  },3000);
+}
+
+function drawBlackHoleFX(ctx,x,y){
+  for(let i=5;i>0;i--){
+    const r=15+i*15;
+    const g=ctx.createRadialGradient(x,y,r*.3,x,y,r);
+    g.addColorStop(0,`hsla(${frame*3+i*30},100%,60%,.25)`);
+    g.addColorStop(1,'transparent');
+    ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fillStyle=g;ctx.fill();
+  }
+  const core=ctx.createRadialGradient(x,y,0,x,y,18);
+  core.addColorStop(0,'#000');core.addColorStop(1,'transparent');
+  ctx.beginPath();ctx.arc(x,y,18,0,Math.PI*2);ctx.fillStyle=core;ctx.fill();
+  ctx.beginPath();ctx.arc(x,y,18,0,Math.PI*2);
+  ctx.strokeStyle=`hsla(${frame*4},100%,70%,.9)`;ctx.lineWidth=2;
+  ctx.shadowBlur=20;ctx.shadowColor='#FF2D7A';ctx.stroke();ctx.shadowBlur=0;
+}
+
+// ═══════════════════════════════════
+//  SPAWN
+// ═══════════════════════════════════
+function spawn(n=14){
+  for(let i=0;i<n;i++)
+    setTimeout(()=>particles.push(new Particle(Math.random()*W,Math.random()*H)),i*100);
+}
+
+function ripple(x,y,col='#FFD700'){
+  const r=document.createElement('div');
+  r.className='rip';r.style.cssText=`left:${x}px;top:${y}px;border-color:${col};`;
+  document.body.appendChild(r);setTimeout(()=>r.remove(),700);
+}
+
+// ═══════════════════════════════════
+//  BACKGROUND RENDERER
+// ═══════════════════════════════════
+function drawBg(){
+  bgCtx.fillStyle='rgba(4,2,12,.14)';bgCtx.fillRect(0,0,W,H);
+
+  // Mouse aurora
+  const g=bgCtx.createRadialGradient(M.x,M.y,0,M.x,M.y,250);
+  const accentHex=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#FF6B35';
+  g.addColorStop(0,accentHex+'0A');g.addColorStop(1,'transparent');
+  bgCtx.fillStyle=g;bgCtx.fillRect(0,0,W,H);
+
+  // World-specific BG effect
+  if(currentWorld==='space'){
+    // Star field
+    if(frame%3===0){
+      bgCtx.fillStyle='rgba(4,4,20,.3)';bgCtx.fillRect(0,0,W,H);
+    }
+    for(let i=0;i<3;i++){
+      const sx=(frame*1.3+i*97)%W,sy=(i*137+60)%H;
+      bgCtx.fillStyle=`rgba(150,180,255,${.1+Math.sin(frame*.1+i)*.08})`;
+      bgCtx.beginPath();bgCtx.arc(sx,sy,1,0,Math.PI*2);bgCtx.fill();
+    }
+  }
+  if(currentWorld==='science'){
+    // Grid lines
+    bgCtx.strokeStyle='rgba(0,255,136,.02)';bgCtx.lineWidth=1;
+    for(let x=0;x<W;x+=40){bgCtx.beginPath();bgCtx.moveTo(x,0);bgCtx.lineTo(x,H);bgCtx.stroke();}
+    for(let y=0;y<H;y+=40){bgCtx.beginPath();bgCtx.moveTo(0,y);bgCtx.lineTo(W,y);bgCtx.stroke();}
+  }
+
+  // Black hole
+  if(blackHoleActive) drawBlackHoleFX(bgCtx,blackHoleX,blackHoleY);
+}
+
+// ═══════════════════════════════════
+//  MODE SWITCH
+// ═══════════════════════════════════
+const MODE_LABELS={gravity:'🌀 GRAVITY',echo:'🌊 ECHO',emotion:'🎭 EMOTION',living:'🧬 LIVING',combo:'🎮 COMBO',reality:'🌌 REALITY',auto:'🚀 AUTO'};
+
+function setMode(m){
+  mode=m;
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('on'));
+  document.getElementById('b-'+m)?.classList.add('on');
+  document.getElementById('mode-label').textContent=MODE_LABELS[m]||m.toUpperCase();
+  ripple(W/2,H*.9,'#FFD700');
+
+  if(m==='combo') showCombo("🎮 COMBO MODE! Click words for points!");
+  if(m==='living') document.getElementById('sentence-area').style.display='block';
+  if(m==='auto') showCombo("🚀 AUTO MODE! Just type and watch!");
+}
+
+// ═══════════════════════════════════
+//  CLICK WORD DETECTION
+// ═══════════════════════════════════
+function checkWordClick(x,y){
+  for(let i=particles.length-1;i>=0;i--){
+    if(particles[i].hit(x,y)){
+      const p=particles[i];
+      addScore(p.wd,x,y);
+      p.dec=.02;
+      // Burst
+      for(let j=0;j<5;j++){
+        const a=Math.PI*2*j/5,s=3+Math.random()*6;
+        particles.push(new Particle(p.x,p.y,p.wd,{vx:Math.cos(a)*s,vy:Math.sin(a)*s,sz:p.sz*.5,dec:.025}));
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
+// ═══════════════════════════════════
+//  PAINT ON DRAG
+// ═══════════════════════════════════
+let pt=0;
+function paintWord(){
+  pt++;if(pt%4!==0) return;
+  const spd=Math.sqrt(M.vx**2+M.vy**2);
+  if(spd>12){
+    particles.push(new Particle(M.x,M.y,WORD_DATA[~~(Math.random()*WORD_DATA.length)],{
+      sz:8+spd*.3,vx:M.vx*.15+(Math.random()-.5)*2,
+      vy:M.vy*.15+(Math.random()-.5)*2,dec:.018
+    }));
+  }
+}
+
+// ═══════════════════════════════════
+//  MAIN LOOP
+// ═══════════════════════════════════
+function loop(){
+  frame++;
+  drawBg();
+
+  // Update + draw particles
+  particles=particles.filter(p=>p.update());
+  particles.forEach(p=>p.draw(bgCtx));
+
+  // Keep minimum
+  if(particles.length<12) spawn(6);
+
+  requestAnimationFrame(loop);
+}
+
+// ═══════════════════════════════════
+//  EVENTS
+// ═══════════════════════════════════
+document.addEventListener('mousemove',e=>{
+  M.vx=e.clientX-M.px;M.vy=e.clientY-M.py;
+  M.px=M.x;M.py=M.y;M.x=e.clientX;M.y=e.clientY;
+  cur.style.left=(e.clientX-10)+'px';cur.style.top=(e.clientY-10)+'px';
+  crd.style.left=(e.clientX-1.5)+'px';crd.style.top=(e.clientY-1.5)+'px';
+  if(M.down) paintWord();
+});
+
+document.addEventListener('mousedown',e=>{
+  M.down=true;cur.classList.add('active');
+  if(e.target.closest('#dock')||e.target.closest('#input-area')) return;
+  if(!checkWordClick(e.clientX,e.clientY)){
+    ripple(e.clientX,e.clientY);
+    particles.forEach(p=>{
+      const dx=p.x-e.clientX,dy=p.y-e.clientY,d=Math.sqrt(dx*dx+dy*dy)||1;
+      if(d<200){const f=(200-d)/200*10;p.vx+=(dx/d)*f;p.vy+=(dy/d)*f;}
+    });
+  }
+});
+
+document.addEventListener('mouseup',()=>{M.down=false;cur.classList.remove('active');});
+
+// Right click = Black hole
+document.addEventListener('contextmenu',e=>{
+  e.preventDefault();
+  if(!e.target.closest('#dock')&&!e.target.closest('#input-area')){
+    activateBlackHole(e.clientX,e.clientY);
+  }
+});
+
+// Input
+document.getElementById('query-input').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){
+    const q=e.target.value.trim();
+    if(q){processQuery(q);e.target.value='';}
+  }
+});
+document.getElementById('query-input').addEventListener('focus',()=>{
+  document.getElementById('query-input').style.pointerEvents='all';
+});
+
+// Touch
+document.addEventListener('touchstart',e=>{
+  if(e.target.closest('#dock')||e.target.closest('#input-area')) return;
+  e.preventDefault();
+  const t=e.touches[0];M.x=t.clientX;M.y=t.clientY;M.down=true;
+  if(!checkWordClick(t.clientX,t.clientY)) ripple(t.clientX,t.clientY);
+},{passive:false});
+
+document.addEventListener('touchmove',e=>{
+  e.preventDefault();const t=e.touches[0];
+  M.vx=t.clientX-M.x;M.vy=t.clientY-M.y;
+  M.x=t.clientX;M.y=t.clientY;paintWord();
+},{passive:false});
+
+document.addEventListener('touchend',()=>M.down=false);
+
+document.addEventListener('keydown',e=>{
+  if(e.code==='Space'&&e.target!==document.getElementById('query-input')){
+    e.preventDefault();activateBlackHole(W/2,H/2);
+  }
+});
+
+window.addEventListener('resize',()=>{
+  W=bgCv.width=fgCv.width=window.innerWidth;
+  H=bgCv.height=fgCv.height=window.innerHeight;
+});
+
+// ─── START ───
+spawn(20);
+loop();
+drawEmotionRing('neutral');
+
+// Welcome
+setTimeout(()=>{
+  showCombo("Welcome to SIA Ultimate! 🕉️");
+  showResponse("SIA","default","neutral");
+},500);
+</script>
+</body>
+</html>
