@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="te">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIA — Anti-Gravity v4</title>
+<link href="https://fonts.googleapis.com/css2?family=Tiro+Telugu&family=Fredoka+One&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#04020C;--gold:#FFD700;--fire:#FF6B35;
+  --cyan:#00FFD4;--green:#00FF88;--pink:#FF2D7A;
+  --purple:#9D4EDD;--blue:#4488FF;
+}
+body{background:var(--bg);width:100vw;height:100vh;overflow:hidden;cursor:none;font-family:'Space Mono',monospace;}
+
+/* Custom cursor */
+#cur{position:fixed;width:22px;height:22px;border:1.5px solid var(--gold);border-radius:50%;pointer-events:none;z-index:9999;mix-blend-mode:screen;transition:transform .08s,border-color .15s;}
+#cur.fast{transform:scale(3);border-color:var(--fire);background:#FF6B3522;}
+#cur.slow{transform:scale(1);border-color:var(--cyan);}
+#cur-dot{position:fixed;width:4px;height:4px;background:var(--gold);border-radius:50%;pointer-events:none;z-index:9999;}
+
+canvas{position:fixed;top:0;left:0;width:100%;height:100%;}
+
+/* HUD */
+#hud{position:fixed;top:0;left:0;right:0;padding:1.2rem 1.5rem;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;z-index:100;}
+.hud-name{font-family:'Tiro Telugu',serif;font-size:2rem;background:linear-gradient(135deg,var(--fire),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:4px;}
+.hud-sub{color:#FF6B0044;font-size:.55rem;letter-spacing:3px;text-transform:uppercase;}
+
+/* Score panel */
+#score-panel{text-align:right;pointer-events:none;}
+#score-val{font-family:'Fredoka One',cursive;font-size:2.2rem;color:var(--gold);text-shadow:0 0 20px var(--gold);line-height:1;}
+#score-label{color:#FFD70055;font-size:.55rem;letter-spacing:2px;text-transform:uppercase;}
+#streak{font-size:.65rem;color:var(--fire);letter-spacing:1px;margin-top:2px;}
+
+/* Word meaning popup */
+#meaning-pop{
+  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  background:linear-gradient(135deg,#0F0A1E,#1A0F2E);
+  border:1px solid var(--gold);border-radius:16px;
+  padding:1.2rem 1.8rem;text-align:center;
+  pointer-events:none;z-index:500;
+  opacity:0;transition:opacity .2s;
+  min-width:220px;
+}
+#meaning-pop.show{opacity:1;}
+#pop-word{font-family:'Tiro Telugu',serif;font-size:1.8rem;color:var(--gold);}
+#pop-meaning{color:#e8e0d8;font-size:.75rem;margin-top:.4rem;line-height:1.5;}
+#pop-points{color:var(--green);font-size:.9rem;font-weight:700;margin-top:.4rem;}
+
+/* Music meter */
+#music-meter{
+  position:fixed;bottom:5rem;right:1.5rem;
+  display:flex;flex-direction:column;gap:3px;
+  align-items:flex-end;pointer-events:none;z-index:100;
+}
+.bar{height:4px;border-radius:2px;transition:width .1s,background .1s;}
+
+/* Speed indicator */
+#speed-ring{
+  position:fixed;bottom:5.5rem;left:1.5rem;
+  width:60px;height:60px;pointer-events:none;z-index:100;
+}
+#speed-label{position:fixed;bottom:4rem;left:1.5rem;color:#FF6B0066;font-size:.55rem;letter-spacing:2px;pointer-events:none;z-index:100;width:60px;text-align:center;}
+
+/* Score popup */
+.score-pop{position:fixed;pointer-events:none;z-index:600;font-family:'Tiro Telugu',serif;animation:scoreUp .9s ease-out forwards;}
+@keyframes scoreUp{0%{opacity:1;transform:translateY(0) scale(1);}100%{opacity:0;transform:translateY(-80px) scale(1.6);}}
+
+/* Mode dock */
+#dock{position:fixed;bottom:1.2rem;left:50%;transform:translateX(-50%);display:flex;gap:.5rem;z-index:200;pointer-events:all;flex-wrap:wrap;justify-content:center;max-width:95vw;}
+.btn{background:#08050F;border:1px solid #FF6B0033;color:#FF6B0066;padding:6px 13px;border-radius:4px;font-size:.55rem;letter-spacing:2px;cursor:pointer;text-transform:uppercase;font-family:'Space Mono',monospace;transition:all .2s;position:relative;overflow:hidden;}
+.btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,var(--fire),var(--gold));opacity:0;transition:opacity .2s;}
+.btn:hover::before,.btn.on::before{opacity:.15;}
+.btn:hover,.btn.on{border-color:var(--fire);color:var(--gold);box-shadow:0 0 15px #FF450033;}
+.btn span{position:relative;z-index:1;}
+
+/* Ripple */
+.rip{position:fixed;border-radius:50%;border:2px solid var(--gold);pointer-events:none;animation:ripOut .7s ease-out forwards;z-index:300;mix-blend-mode:screen;}
+@keyframes ripOut{0%{width:0;height:0;opacity:.9;margin:0;}100%{width:200px;height:200px;opacity:0;margin:-100px;}}
+
+#scan{position:fixed;inset:0;pointer-events:none;z-index:400;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 4px);}
+#vig{position:fixed;inset:0;pointer-events:none;z-index:1;background:radial-gradient(ellipse at center,transparent 40%,#04020Caa 100%);}
+</style>
+</head>
+<body>
+<div id="scan"></div>
+<div id="vig"></div>
+<div id="cur"></div>
+<div id="cur-dot"></div>
+<canvas id="c"></canvas>
+
+<!-- HUD -->
+<div id="hud">
+  <div>
+    <div class="hud-name">🕉 SIA</div>
+    <div class="hud-sub">Anti-Gravity · Learn & Play</div>
+  </div>
+  <div id="score-panel">
+    <div id="score-val">0</div>
+    <div id="score-label">పాయింట్లు</div>
+    <div id="streak"></div>
+  </div>
+</div>
+
+<!-- Word meaning popup -->
+<div id="meaning-pop">
+  <div id="pop-word"></div>
+  <div id="pop-meaning"></div>
+  <div id="pop-points"></div>
+</div>
+
+<!-- Music meter bars -->
+<div id="music-meter">
+  <div class="bar" id="b1" style="width:30px;background:var(--fire)"></div>
+  <div class="bar" id="b2" style="width:20px;background:var(--gold)"></div>
+  <div class="bar" id="b3" style="width:25px;background:var(--cyan)"></div>
+  <div class="bar" id="b4" style="width:15px;background:var(--green)"></div>
+  <div class="bar" id="b5" style="width:20px;background:var(--purple)"></div>
+</div>
+
+<!-- Speed ring canvas -->
+<canvas id="speed-ring" width="60" height="60"></canvas>
+<div id="speed-label">SPEED</div>
+
+<!-- Mode dock -->
+<div id="dock">
+  <button class="btn on" id="b-float"     onclick="go('float')"><span>🌊 Float</span></button>
+  <button class="btn"    id="b-vortex"    onclick="go('vortex')"><span>🌀 Vortex</span></button>
+  <button class="btn"    id="b-fire"      onclick="go('fire')"><span>🔥 Fire</span></button>
+  <button class="btn"    id="b-matrix"    onclick="go('matrix')"><span>⬇ Matrix</span></button>
+  <button class="btn"    id="b-blackhole" onclick="go('blackhole')"><span>⚫ Hole</span></button>
+  <button class="btn"    id="b-snow"      onclick="go('snow')"><span>❄️ Snow</span></button>
+  <button class="btn"    id="b-rainbow"   onclick="go('rainbow')"><span>🌈 Rainbow</span></button>
+  <button class="btn"    id="b-bang"      onclick="bigbang()"><span>💥 Bang!</span></button>
+</div>
+
+<script>
+// ═══════════════════════════════════
+//  AUDIO ENGINE — speed reactive
+// ═══════════════════════════════════
+let AC = null;
+let masterGain, reverbGain, delayNode;
+let currentSpeed = 0;
+let musicIntensity = 0;
+
+function initAudio(){
+  if(AC) return;
+  AC = new (window.AudioContext||window.webkitAudioContext)();
+  masterGain = AC.createGain();
+  masterGain.gain.value = 0.4;
+  masterGain.connect(AC.destination);
+
+  // Reverb (convolver approximation with delay)
+  delayNode = AC.createDelay(.5);
+  delayNode.delayTime.value = .25;
+  reverbGain = AC.createGain();
+  reverbGain.gain.value = .3;
+  delayNode.connect(reverbGain);
+  reverbGain.connect(masterGain);
+}
+
+// Play a tone — pitch and volume react to speed
+function tone(freq, type='sine', dur=.2, vol=.08){
+  if(!AC) return;
+  try{
+    const osc  = AC.createOscillator();
+    const gain = AC.createGain();
+    const speedMul = .5 + Math.min(currentSpeed/200, 2);
+    osc.connect(gain);
+    gain.connect(masterGain);
+    gain.connect(delayNode);
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq * speedMul, AC.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(freq*.5*speedMul, AC.currentTime+dur);
+    gain.gain.setValueAtTime(vol * Math.min(speedMul, 2), AC.currentTime);
+    gain.gain.exponentialRampToValueAtTime(.001, AC.currentTime+dur);
+    osc.start();
+    osc.stop(AC.currentTime+dur+.05);
+  }catch(e){}
+}
+
+// Ambient drone that changes with speed
+let droneOsc = null, droneGain = null;
+function startDrone(){
+  if(!AC || droneOsc) return;
+  droneOsc  = AC.createOscillator();
+  droneGain = AC.createGain();
+  droneOsc.connect(droneGain);
+  droneGain.connect(masterGain);
+  droneOsc.type='sine';
+  droneOsc.frequency.value=55;
+  droneGain.gain.value=0;
+  droneOsc.start();
+}
+
+function updateDrone(speed){
+  if(!droneOsc) return;
+  const intensity = Math.min(speed/300, 1);
+  const freq = 55 + intensity*165; // 55Hz slow → 220Hz fast
+  droneOsc.frequency.setTargetAtTime(freq, AC.currentTime, .3);
+  droneGain.gain.setTargetAtTime(intensity*.15, AC.currentTime, .2);
+}
+
+// Speed-based melody — slow = soft notes, fast = intense beats
+let lastNoteTime = 0;
+function playSpeedMusic(speed, frame){
+  if(!AC) return;
+  const now = AC.currentTime;
+  const interval = Math.max(.08, .6 - speed*.002); // fast = shorter interval
+
+  if(now - lastNoteTime < interval) return;
+  lastNoteTime = now;
+
+  if(speed < 20){
+    // Slow — gentle ambient melody
+    const slowNotes=[261,293,329,349,392];
+    tone(slowNotes[frame%slowNotes.length],'sine',.4,.04);
+  } else if(speed < 80){
+    // Medium — happy bouncy
+    const midNotes=[392,440,494,523,587];
+    tone(midNotes[frame%midNotes.length],'triangle',.2,.06);
+    if(frame%4===0) tone(196,'sine',.3,.04);
+  } else if(speed < 150){
+    // Fast — energetic
+    const fastNotes=[523,587,659,698,784];
+    tone(fastNotes[frame%fastNotes.length],'square',.1,.08);
+    tone(fastNotes[frame%fastNotes.length]/2,'sawtooth',.15,.05);
+  } else {
+    // VERY fast — intense drum-like
+    tone(80+Math.random()*40,'sawtooth',.08,.12);
+    if(frame%2===0) tone(440+Math.random()*200,'square',.06,.08);
+    if(frame%3===0) tone(1200,'sine',.04,.05);
+  }
+  updateDrone(speed);
+}
+
+// Click sound varies by word category
+function playWordSound(category){
+  if(!AC) return;
+  const sounds={
+    motivate: ()=>{ tone(523,'sine',.15,.1); setTimeout(()=>tone(659,'sine',.1,.08),80); },
+    spiritual: ()=>{ tone(174,'sine',.5,.06); tone(261,'sine',.4,.04); },
+    fun:       ()=>{ tone(880,'triangle',.1,.09); setTimeout(()=>tone(1100,'triangle',.08,.07),60); },
+    nature:    ()=>{ tone(349,'sine',.3,.07); setTimeout(()=>tone(440,'sine',.2,.05),100); },
+    emoji:     ()=>{ tone(660+Math.random()*200,'sine',.12,.09); }
+  };
+  (sounds[category]||sounds.emoji)();
+}
+
+function playExplodeSound(){
+  if(!AC) return;
+  [80,120,160,200].forEach((f,i)=>setTimeout(()=>tone(f,'sawtooth',.3,.12),i*40));
+}
+
+function playBangSound(){
+  if(!AC) return;
+  [55,80,110,160,220].forEach((f,i)=>setTimeout(()=>tone(f,'sawtooth',.5,.15),i*50));
+  setTimeout(()=>tone(880,'sine',.3,.08),300);
+}
+
+function playModeSound(m){
+  if(!AC) return;
+  const notes={float:392,vortex:440,fire:330,matrix:220,blackhole:110,snow:660,rainbow:523};
+  tone(notes[m]||440,'sine',.3,.1);
+}
+
+// ═══════════════════════════════════
+//  WORD DATABASE WITH MEANINGS + POINTS
+// ═══════════════════════════════════
+const WORDS = [
+  // Motivational
+  {w:"చదువు",  m:"Education — జ్ఞానం నీ ఆయుధం",           cat:"motivate", pts:10, col:"#FFD700"},
+  {w:"గెలుపు", m:"Victory — నువ్వు గెలవగలవు!",             cat:"motivate", pts:15, col:"#FFD700"},
+  {w:"ఆశ",     m:"Hope — ఎప్పుడూ ఆశ వదలకు",               cat:"motivate", pts:10, col:"#FF9500"},
+  {w:"కల",     m:"Dream — కలలు కనండి, నిజం చేయండి",        cat:"motivate", pts:10, col:"#FF9500"},
+  {w:"శక్తి",  m:"Power — నీలో అపార శక్తి ఉంది",           cat:"motivate", pts:12, col:"#FF6B35"},
+  {w:"విజయం", m:"Success — కష్టం తర్వాత విజయం తప్పదు",    cat:"motivate", pts:15, col:"#FFD700"},
+  {w:"ధైర్యం", m:"Courage — ధైర్యంగా ముందుకు వెళ్ళు",      cat:"motivate", pts:12, col:"#FF6B35"},
+  {w:"నమ్మకం", m:"Belief — నిన్ను నువ్వు నమ్ము",           cat:"motivate", pts:10, col:"#FF9500"},
+  {w:"ప్రయత్నం",m:"Effort — ప్రయత్నించిన వాడే గెలుస్తాడు", cat:"motivate", pts:20, col:"#FFD700"},
+  {w:"సాఫల్యం",m:"Achievement — నీ లక్ష్యం చేరుకో",        cat:"motivate", pts:20, col:"#FFD700"},
+
+  // Spiritual
+  {w:"ఓం",     m:"Om — బ్రహ్మాండ శబ్దం, సర్వ మంగళం",      cat:"spiritual",pts:25, col:"#FF2D7A"},
+  {w:"శాంతి",  m:"Peace — మనసు శాంతిగా ఉండాలి",           cat:"spiritual",pts:15, col:"#9D4EDD"},
+  {w:"భక్తి",  m:"Devotion — దైవ భక్తి జీవితానికి బలం",    cat:"spiritual",pts:15, col:"#9D4EDD"},
+  {w:"ధర్మం",  m:"Righteousness — ధర్మం తప్పకు",           cat:"spiritual",pts:20, col:"#FF2D7A"},
+  {w:"సత్యం",  m:"Truth — సత్యమే జయం",                    cat:"spiritual",pts:20, col:"#9D4EDD"},
+  {w:"ప్రేమ",  m:"Love — ప్రేమే జీవితం",                   cat:"spiritual",pts:15, col:"#FF2D7A"},
+  {w:"కరుణ",   m:"Compassion — అందరిపై దయ చూపు",           cat:"spiritual",pts:15, col:"#9D4EDD"},
+
+  // Fun slang
+  {w:"బ్రో!",  m:"Bro — Telugu లో best friend call",        cat:"fun",      pts:5,  col:"#00FFD4"},
+  {w:"మస్తు!", m:"Fantastic — చాలా బాగుంది అని అర్థం",      cat:"fun",      pts:5,  col:"#00FF88"},
+  {w:"సూపర్!", m:"Super — అద్భుతంగా ఉందని చెప్పడం",         cat:"fun",      pts:5,  col:"#00FFD4"},
+  {w:"వావ్!",  m:"Wow — ఆశ్చర్యపోయినప్పుడు అంటాం",          cat:"fun",      pts:5,  col:"#00FF88"},
+  {w:"హురే!",  m:"Hooray — సంతోషంగా అరవడం",                 cat:"fun",      pts:8,  col:"#00FFD4"},
+  {w:"SIA",    m:"Smart Indian Assistant — మీ Telugu AI",   cat:"fun",      pts:30, col:"#FFD700"},
+
+  // Nature
+  {w:"🌺 పువ్వు",m:"Flower — అందం చూపించే ప్రకృతి",        cat:"nature",   pts:8,  col:"#FF6B9D"},
+  {w:"🌊 అలలు", m:"Waves — సముద్రపు శక్తి",                 cat:"nature",   pts:8,  col:"#4488FF"},
+  {w:"☀️ సూర్యుడు",m:"Sun — జీవం ఇచ్చే దేవుడు",           cat:"nature",   pts:10, col:"#FFD700"},
+  {w:"🌙 చందమామ",m:"Moon — రాత్రి వెలుగు",                 cat:"nature",   pts:10, col:"#AACCFF"},
+  {w:"🦚 నెమలి", m:"Peacock — భారతదేశ జాతీయ పక్షి",        cat:"nature",   pts:12, col:"#00FF88"},
+  {w:"🦋 సీతాకోక",m:"Butterfly — రూపాంతరం చెందే అద్భుతం",  cat:"nature",   pts:12, col:"#FF9DD4"},
+
+  // Emojis with meaning
+  {w:"🔥",     m:"Fire — మీ passion మండిస్తూ ఉండు!",        cat:"emoji",    pts:8,  col:"#FF4500"},
+  {w:"⭐",     m:"Star — నువ్వు ఒక నక్షత్రానివి!",          cat:"emoji",    pts:8,  col:"#FFD700"},
+  {w:"💪",     m:"Strong — నువ్వు చాలా బలంగా ఉన్నావు!",     cat:"emoji",    pts:8,  col:"#FF6B35"},
+  {w:"🙏",     m:"Namaste — గౌరవంగా అభివాదం",               cat:"emoji",    pts:10, col:"#9D4EDD"},
+  {w:"🚀",     m:"Rocket — ఆకాశమే హద్దు, ముందుకు వెళ్ళు!", cat:"emoji",    pts:15, col:"#4488FF"},
+  {w:"🏆",     m:"Trophy — నీ గెలుపు నీకు రావాల్సిందే!",    cat:"emoji",    pts:20, col:"#FFD700"},
+  {w:"💎",     m:"Diamond — నువ్వు విలువైన వాడివి!",         cat:"emoji",    pts:25, col:"#00FFD4"},
+  {w:"🎯",     m:"Target — నీ లక్ష్యాన్ని చేరుకో!",         cat:"emoji",    pts:15, col:"#FF6B35"},
+];
+
+// ═══════════════════════════════════
+//  CANVAS SETUP
+// ═══════════════════════════════════
+const cv  = document.getElementById('c');
+const ctx = cv.getContext('2d');
+const cur = document.getElementById('cur');
+const crd = document.getElementById('cur-dot');
+const speedCv  = document.getElementById('speed-ring');
+const speedCtx = speedCv.getContext('2d');
+
+let W = cv.width  = window.innerWidth;
+let H = cv.height = window.innerHeight;
+
+const M = {x:W/2,y:H/2,px:W/2,py:H/2,vx:0,vy:0,down:false};
+let mode='float', P=[], frame=0;
+let score=0, streak=0, streakTimer=null;
+let popTimer=null;
+let interacted=false;
+
+// ═══════════════════════════════════
+//  PARTICLE CLASS
+// ═══════════════════════════════════
+class Particle {
+  constructor(x,y,wordObj,o={}){
+    this.x    = x  ?? Math.random()*W;
+    this.y    = y  ?? Math.random()*H;
+    this.wo   = wordObj ?? WORDS[~~(Math.random()*WORDS.length)];
+    this.sz   = o.sz ?? (13+Math.random()*24);
+    this.col  = o.col ?? this.wo.col;
+    this.vx   = o.vx ?? (Math.random()-.5)*4;
+    this.vy   = o.vy ?? (Math.random()-.5)*4;
+    this.rot  = Math.random()*Math.PI*2;
+    this.rs   = (Math.random()-.5)*.08;
+    this.a    = 0; this.ta=.55+Math.random()*.4;
+    this.life = 1; this.dec=o.dec??0;
+    this.pulse= Math.random()*Math.PI*2;
+    this.wob  = Math.random()*Math.PI*2;
+    this.trail= [];
+    this.glow = false;
+    this.hue  = Math.random()*360;
+    this.clicked = false;
+  }
+
+  // Check if point (px,py) is inside this particle
+  hit(px,py){
+    const dx=px-this.x, dy=py-this.y;
+    return Math.sqrt(dx*dx+dy*dy) < this.sz*.8;
+  }
+
+  update(){
+    if(this.a<this.ta) this.a=Math.min(this.a+.025,this.ta);
+    this.trail.push({x:this.x,y:this.y,a:this.a*.2});
+    if(this.trail.length>10) this.trail.shift();
+    this.pulse+=.055; this.wob+=.028; this.rot+=this.rs; this.hue+=.8;
+
+    switch(mode){
+      case 'float':
+        this.vy-=.016; this.vx+=Math.sin(this.wob)*.04; this.vy+=Math.cos(this.wob+.5)*.02; break;
+      case 'vortex':{
+        const dx=this.x-W/2,dy=this.y-H/2,d=Math.sqrt(dx*dx+dy*dy)||1;
+        const ang=Math.atan2(dy,dx),spd=Math.min(130/d,4);
+        this.vx+=Math.cos(ang+Math.PI/2)*spd*.045-(dx/d)*.12;
+        this.vy+=Math.sin(ang+Math.PI/2)*spd*.045-(dy/d)*.12; break;}
+      case 'fire':
+        this.vy-=.06+Math.random()*.04; this.vx+=(Math.random()-.5)*.15;
+        if(!this.dec) this.dec=.004+Math.random()*.006; break;
+      case 'matrix':
+        this.vy=3.5+this.sz*.07; this.vx=Math.sin(this.wob)*.25;
+        if(this.y>H+30){this.y=-15;this.x=Math.random()*W;} break;
+      case 'blackhole':{
+        const dx=this.x-W/2,dy=this.y-H/2,d=Math.sqrt(dx*dx+dy*dy)||1;
+        const pull=3000/(d*d+200);
+        this.vx-=(dx/d)*pull*.15; this.vy-=(dy/d)*pull*.15;
+        const ang=Math.atan2(dy,dx);
+        this.vx+=Math.cos(ang+Math.PI/2)*pull*.1;
+        this.vy+=Math.sin(ang+Math.PI/2)*pull*.1;
+        if(d<20) this.life=0; break;}
+      case 'snow':
+        this.vy=.8+this.sz*.04; this.vx=Math.sin(this.wob+=.02)*.6; this.rs=.008;
+        if(this.y>H+30){this.y=-15;this.x=Math.random()*W;} break;
+      case 'rainbow':
+        this.vy-=.015+Math.sin(this.pulse)*.01; this.vx+=Math.sin(this.wob)*.06;
+        this.col=`hsl(${this.hue%360},100%,65%)`; break;
+    }
+
+    // mouse
+    const dx=this.x-M.x,dy=this.y-M.y,d=Math.sqrt(dx*dx+dy*dy)||1;
+    if(M.down&&d<160){this.vx-=(dx/d)*3;this.vy-=(dy/d)*3;this.glow=true;}
+    else if(d<90){this.vx+=(dx/d)*.8;this.vy+=(dy/d)*.8;this.glow=d<55;}
+    else this.glow=false;
+
+    if(!['matrix','blackhole','snow'].includes(mode)){
+      this.x+=this.vx;this.y+=this.vy;this.vx*=.97;this.vy*=.97;
+      if(this.x<8){this.x=8;this.vx=Math.abs(this.vx)*.65;}
+      if(this.x>W-8){this.x=W-8;this.vx=-Math.abs(this.vx)*.65;}
+      if(this.y<8){this.y=8;this.vy=Math.abs(this.vy)*.65;}
+      if(this.y>H-8){this.y=H-8;this.vy=-Math.abs(this.vy)*.65;}
+    }
+    if(this.dec>0){this.life-=this.dec;this.a=this.life*this.ta;}
+    return this.life>.02;
+  }
+
+  draw(){
+    // trail
+    for(let i=0;i<this.trail.length;i++){
+      const t=this.trail[i],f=i/this.trail.length;
+      ctx.save();ctx.globalAlpha=t.a*f*.5;ctx.fillStyle=this.col;
+      ctx.shadowBlur=6;ctx.shadowColor=this.col;
+      ctx.font=(this.sz*.6)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(this.wo.w,t.x,t.y);ctx.restore();
+    }
+
+    ctx.save();ctx.translate(this.x,this.y);ctx.rotate(this.rot);
+    const sc=1+Math.sin(this.pulse)*.12;ctx.scale(sc,sc);
+
+    // clicked = rainbow shimmer
+    const drawCol = this.clicked
+      ? `hsl(${this.hue%360},100%,65%)`
+      : (mode==='rainbow'?`hsl(${this.hue%360},100%,65%)`:this.col);
+
+    ctx.shadowBlur=this.glow?50:14;
+    ctx.shadowColor=this.glow?'#FFD700':drawCol;
+    ctx.globalAlpha=this.a;ctx.fillStyle=drawCol;
+    ctx.font=this.sz+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(this.wo.w,0,0);
+
+    // points badge on glow
+    if(this.glow){
+      ctx.fillStyle='#FFD700';ctx.shadowColor='#FFD700';ctx.shadowBlur=20;
+      ctx.font=(this.sz*.3)+'px Space Mono';
+      ctx.fillText('+'+this.wo.pts,this.sz*.5,-this.sz*.6);
+    }
+    ctx.restore();
+  }
+}
+
+// ═══════════════════════════════════
+//  SCORE SYSTEM
+// ═══════════════════════════════════
+function addScore(wo, x, y){
+  const pts = wo.pts * (streak>2?2:1);
+  score += pts;
+  document.getElementById('score-val').textContent = score;
+
+  // streak
+  streak++;
+  clearTimeout(streakTimer);
+  streakTimer = setTimeout(()=>streak=0, 2000);
+  const streakEl = document.getElementById('streak');
+  if(streak>1) streakEl.textContent=`🔥 ${streak}x Streak!`;
+  else streakEl.textContent='';
+
+  // score popup at click position
+  const pop=document.createElement('div');
+  pop.className='score-pop';
+  pop.style.cssText=`left:${x}px;top:${y-20}px;font-size:1.3rem;color:${wo.col};text-shadow:0 0 15px ${wo.col};`;
+  pop.textContent=`+${pts}`;
+  document.body.appendChild(pop);
+  setTimeout(()=>pop.remove(),900);
+
+  // show meaning
+  showMeaning(wo);
+  playWordSound(wo.cat);
+}
+
+function showMeaning(wo){
+  const pop=document.getElementById('meaning-pop');
+  document.getElementById('pop-word').textContent=wo.w;
+  document.getElementById('pop-meaning').textContent=wo.m;
+  document.getElementById('pop-points').textContent=`+${wo.pts} పాయింట్లు ✨`;
+  pop.style.borderColor=wo.col;
+  document.getElementById('pop-word').style.color=wo.col;
+  pop.classList.add('show');
+  clearTimeout(popTimer);
+  popTimer=setTimeout(()=>pop.classList.remove('show'),1800);
+}
+
+// ═══════════════════════════════════
+//  CLICK DETECTION ON WORDS
+// ═══════════════════════════════════
+function checkWordClick(x,y){
+  for(let i=P.length-1;i>=0;i--){
+    if(P[i].hit(x,y)){
+      const p=P[i];
+      addScore(p.wo,x,y);
+      // explode this particle
+      p.clicked=true;
+      p.dec=.02;
+      // burst smaller copies
+      for(let j=0;j<6;j++){
+        const ang=Math.PI*2*j/6,spd=3+Math.random()*5;
+        const np=new Particle(p.x,p.y,p.wo,{
+          vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd,
+          sz:p.sz*.5,dec:.025,col:p.col
+        });
+        P.push(np);
+      }
+      ripple(x,y,p.wo.col);
+      return true;
+    }
+  }
+  return false;
+}
+
+// ═══════════════════════════════════
+//  SPEED METER
+// ═══════════════════════════════════
+function drawSpeedRing(speed){
+  speedCtx.clearRect(0,0,60,60);
+  const prog=Math.min(speed/300,1);
+  const col=prog<.3?'#00FFD4':prog<.7?'#FFD700':'#FF4500';
+
+  // background ring
+  speedCtx.strokeStyle='#ffffff11';speedCtx.lineWidth=4;
+  speedCtx.beginPath();speedCtx.arc(30,30,22,0,Math.PI*2);speedCtx.stroke();
+
+  // progress ring
+  speedCtx.strokeStyle=col;speedCtx.lineWidth=4;
+  speedCtx.lineCap='round';
+  speedCtx.beginPath();speedCtx.arc(30,30,22,-Math.PI/2,-Math.PI/2+Math.PI*2*prog);speedCtx.stroke();
+
+  // center dot
+  speedCtx.fillStyle=col;
+  speedCtx.beginPath();speedCtx.arc(30,30,5,0,Math.PI*2);speedCtx.fill();
+}
+
+// Update music meter bars
+function updateMusicMeter(speed){
+  const bars=['b1','b2','b3','b4','b5'];
+  const intensity=Math.min(speed/200,1);
+  bars.forEach((id,i)=>{
+    const b=document.getElementById(id);
+    const w=10+intensity*60+Math.sin(frame*.1+i)*(intensity*20);
+    b.style.width=~~w+'px';
+    b.style.opacity=.4+intensity*.6;
+  });
+}
+
+// ═══════════════════════════════════
+//  SPAWN
+// ═══════════════════════════════════
+function spawn(n=14){
+  for(let i=0;i<n;i++)
+    setTimeout(()=>P.push(new Particle(Math.random()*W,Math.random()*H,WORDS[~~(Math.random()*WORDS.length)])),i*100);
+}
+
+function spawnFire(){
+  const wo=WORDS[~~(Math.random()*WORDS.length)];
+  P.push(new Particle(W*.15+Math.random()*W*.7,H-10,wo,{
+    vx:(Math.random()-.5)*2,vy:-(3+Math.random()*5),sz:10+Math.random()*22
+  }));
+}
+
+// ═══════════════════════════════════
+//  EXPLODE + BIG BANG
+// ═══════════════════════════════════
+function explode(x,y){
+  interacted=true;
+  if(!checkWordClick(x,y)){
+    // No word hit — general explosion
+    playExplodeSound();
+    P.forEach(p=>{
+      const dx=p.x-x,dy=p.y-y,d=Math.sqrt(dx*dx+dy*dy)||1;
+      if(d<200){const f=(200-d)/200*12;p.vx+=(dx/d)*f;p.vy+=(dy/d)*f;}
+    });
+    // spawn new words
+    for(let i=0;i<8;i++){
+      const ang=Math.PI*2*i/8,spd=4+Math.random()*8;
+      P.push(new Particle(x,y,WORDS[~~(Math.random()*WORDS.length)],{
+        vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd,sz:10+Math.random()*18,dec:.014
+      }));
+    }
+    ripple(x,y);
+  }
+}
+
+function bigbang(){
+  playBangSound();
+  P.forEach(p=>{
+    const a=Math.random()*Math.PI*2,s=6+Math.random()*18;
+    p.vx=Math.cos(a)*s;p.vy=Math.sin(a)*s;p.dec=.005;p.glow=true;
+  });
+  ripple(W/2,H/2,'#FF2D7A');ripple(W/2,H/2,'#FFD700');
+  setTimeout(()=>{P=[];spawn(20);},2000);
+}
+
+function ripple(x,y,col='#FFD700'){
+  const r=document.createElement('div');
+  r.className='rip';r.style.cssText=`left:${x}px;top:${y}px;border-color:${col};`;
+  document.body.appendChild(r);setTimeout(()=>r.remove(),700);
+}
+
+// ═══════════════════════════════════
+//  MODE SWITCH
+// ═══════════════════════════════════
+function go(m){
+  mode=m;playModeSound(m);
+  document.querySelectorAll('.btn').forEach(b=>b.classList.remove('on'));
+  document.getElementById('b-'+m)?.classList.add('on');
+  if(['matrix','snow'].includes(m)) P.forEach(p=>{p.x=Math.random()*W;p.y=Math.random()*H;p.vx=0;p.vy=0;});
+  if(m==='fire') P=[];
+  if(m==='blackhole'&&P.length<20) spawn(20);
+}
+
+// ═══════════════════════════════════
+//  BACKGROUND
+// ═══════════════════════════════════
+function drawBg(){
+  const alpha=mode==='matrix'?.18:.13;
+  ctx.fillStyle=`rgba(4,2,12,${alpha})`;ctx.fillRect(0,0,W,H);
+  const g=ctx.createRadialGradient(M.x,M.y,0,M.x,M.y,260);
+  g.addColorStop(0,`rgba(255,107,0,${.03+Math.min(currentSpeed/3000,.03)})`);
+  g.addColorStop(1,'transparent');
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  if(mode==='vortex'){
+    const vg=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,150);
+    vg.addColorStop(0,'rgba(255,215,0,.05)');vg.addColorStop(1,'transparent');
+    ctx.fillStyle=vg;ctx.fillRect(0,0,W,H);
+  }
+  if(mode==='blackhole'){
+    const cx=W/2,cy=H/2;
+    for(let i=5;i>0;i--){
+      const r=18+i*20,gr=ctx.createRadialGradient(cx,cy,r*.3,cx,cy,r);
+      gr.addColorStop(0,`hsla(${frame*2+i*30},100%,60%,.3)`);gr.addColorStop(1,'transparent');
+      ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fillStyle=gr;ctx.fill();
+    }
+    ctx.beginPath();ctx.arc(cx,cy,22,0,Math.PI*2);ctx.fillStyle='#000';ctx.fill();
+    ctx.beginPath();ctx.arc(cx,cy,22,0,Math.PI*2);
+    ctx.strokeStyle=`hsla(${frame*3},100%,70%,.8)`;ctx.lineWidth=1.5;ctx.stroke();
+  }
+}
+
+// ═══════════════════════════════════
+//  PAINT WORDS ON DRAG
+// ═══════════════════════════════════
+let pt=0;
+function paintWord(){
+  pt++;if(pt%3!==0) return;
+  const spd=Math.sqrt(M.vx**2+M.vy**2);
+  if(spd>10){
+    P.push(new Particle(M.x,M.y,WORDS[~~(Math.random()*WORDS.length)],{
+      sz:8+spd*.35,vx:M.vx*.15+(Math.random()-.5)*2,
+      vy:M.vy*.15+(Math.random()-.5)*2,dec:.018
+    }));
+  }
+}
+
+// ═══════════════════════════════════
+//  MAIN LOOP
+// ═══════════════════════════════════
+function loop(){
+  frame++;
+
+  // update speed
+  currentSpeed = Math.sqrt(M.vx**2+M.vy**2)*10;
+  currentSpeed = currentSpeed*.3 + currentSpeed*.7; // smooth
+  musicIntensity = Math.min(currentSpeed/200,1);
+
+  drawBg();
+
+  if(mode==='fire'&&frame%5===0) spawnFire();
+
+  P=P.filter(p=>p.update());
+  P.forEach(p=>p.draw());
+
+  if(['float','vortex','blackhole','rainbow'].includes(mode)&&P.length<10) spawn(6);
+  if(['matrix','snow'].includes(mode)&&P.length<22)
+    for(let i=0;i<3;i++) P.push(new Particle(Math.random()*W,-15,WORDS[~~(Math.random()*WORDS.length)]));
+
+  // speed reactive music
+  playSpeedMusic(currentSpeed, frame);
+
+  // update UI
+  drawSpeedRing(currentSpeed);
+  updateMusicMeter(currentSpeed);
+
+  // cursor color based on speed
+  if(currentSpeed>100) cur.classList.add('fast');
+  else {cur.classList.remove('fast');}
+
+  requestAnimationFrame(loop);
+}
+
+// ═══════════════════════════════════
+//  EVENTS
+// ═══════════════════════════════════
+document.addEventListener('mousemove',e=>{
+  M.vx=e.clientX-M.px;M.vy=e.clientY-M.py;
+  M.px=M.x;M.py=M.y;M.x=e.clientX;M.y=e.clientY;
+  cur.style.left=(e.clientX-11)+'px';cur.style.top=(e.clientY-11)+'px';
+  crd.style.left=(e.clientX-2)+'px';crd.style.top=(e.clientY-2)+'px';
+  if(M.down) paintWord();
+});
+
+document.addEventListener('mousedown',e=>{
+  initAudio();startDrone();
+  M.down=true;
+  if(!e.target.closest('#dock')) explode(e.clientX,e.clientY);
+});
+document.addEventListener('mouseup',()=>M.down=false);
+
+document.addEventListener('touchstart',e=>{
+  if(e.target.closest('#dock')) return;
+  e.preventDefault();
+  initAudio();startDrone();
+  const t=e.touches[0];M.x=t.clientX;M.y=t.clientY;M.down=true;
+  explode(t.clientX,t.clientY);
+},{passive:false});
+
+document.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  const t=e.touches[0];
+  M.vx=t.clientX-M.x;M.vy=t.clientY-M.y;
+  M.x=t.clientX;M.y=t.clientY;
+  paintWord();
+},{passive:false});
+
+document.addEventListener('touchend',()=>M.down=false);
+
+document.addEventListener('keydown',e=>{
+  if(e.code==='Space'){e.preventDefault();initAudio();startDrone();bigbang();}
+  if(e.key==='1') go('float');if(e.key==='2') go('vortex');
+  if(e.key==='3') go('fire'); if(e.key==='4') go('matrix');
+  if(e.key==='5') go('blackhole');if(e.key==='6') go('snow');
+  if(e.key==='7') go('rainbow');
+});
+
+window.addEventListener('resize',()=>{W=cv.width=window.innerWidth;H=cv.height=window.innerHeight;});
+
+// ── START ──
+spawn(18);
+loop();
+</script>
+</body>
+</html>
