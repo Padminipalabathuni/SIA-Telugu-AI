@@ -6,14 +6,37 @@
 """
 
 import os, json, re, base64, datetime, asyncio
-import threading, psutil, requests, random
+import threading, random
 import streamlit as st
 import streamlit.components.v1 as components
 from groq import Groq
-import speech_recognition as sr
-from duckduckgo_search import DDGS
-from PIL import Image
-import io
+
+try:
+    import psutil
+except:
+    psutil = None
+
+try:
+    import requests
+except:
+    requests = None
+
+try:
+    import speech_recognition as sr
+except:
+    sr = None
+
+try:
+    from duckduckgo_search import DDGS
+except:
+    DDGS = None
+
+try:
+    from PIL import Image
+    import io
+except:
+    Image = None
+    io = None
 
 st.set_page_config(page_title="SIA — Telugu AI Companion", page_icon="🕉️", layout="centered")
 
