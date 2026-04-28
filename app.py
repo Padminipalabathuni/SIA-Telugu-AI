@@ -408,10 +408,33 @@ def chat(user_msg,history,extra=""):
     dialect=detect_dialect(user_msg); emotion=detect_emotion(user_msg)
     intents=detect_intents(user_msg); vm=detect_voice_mode(user_msg)
     log_habit(emotion,user_msg[:50],datetime.datetime.now().hour)
-    system=build_system(intents,dialect,emotion,vm,history,extra)
-    messages=[{"role":"system","content":system}]+history[-6:]+[{"role":"user","content":user_msg}]
-    r=client.chat.completions.create(model=CHAT_MODEL,messages=messages,max_tokens=250,temperature=0.85)
-    reply=r.choices[0].message.content
+
+    # Build simple short prompt
+    now=datetime.datetime.now()
+    hour=now.hour
+    greet="శుభోదయం" if hour<12 else ("శుభ మధ్యాహ్నం" if hour<17 else "శుభ సాయంత్రం")
+    dialect_slang=", ".join(DIALECTS[dialect]["slang"]) if dialect in DIALECTS else ""
+    emotion_tips={"anxious":"calm and reassuring","sad":"warm and caring","excited":"energetic","lazy":"loving but firm","lost":"give clear steps","motivated":"fuel energy","neutral":"helpful"}
+
+    system=f"You are SIA, a Telugu AI friend. Always reply in Telugu. {greet}! Dialect:{dialect} {dialect_slang}. Emotion:{emotion} - be {emotion_tips.get(emotion,'helpful')}. Max 3 lines. End with one action."
+
+    # Add history (last 4 only)
+    msgs=[{"role":"system","content":system}]
+    for m in history[-4:]:
+        msgs.append({"role":m["role"],"content":m["content"][:200]})
+    msgs.append({"role":"user","content":user_msg[:500]})
+
+    try:
+        r=client.chat.completions.create(
+            model=CHAT_MODEL,
+            messages=msgs,
+            max_tokens=200,
+            temperature=0.85
+        )
+        reply=r.choices[0].message.content
+    except Exception as e:
+        reply=f"సియా ఇప్పుడు busy గా ఉంది. మళ్ళీ try చేయండి! 🙏"
+
     increment_counter(dialect=dialect,emotion=emotion)
     return reply,dialect,emotion,vm
 
