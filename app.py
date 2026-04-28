@@ -43,7 +43,7 @@ st.set_page_config(page_title="SIA — Telugu AI Companion", page_icon="🕉️"
 GROQ_API_KEY   = st.secrets.get("GROQ_API_KEY",   "your-groq-key")
 SARVAM_API_KEY = st.secrets.get("SARVAM_API_KEY", "your-sarvam-key")
 client         = Groq(api_key=GROQ_API_KEY)
-CHAT_MODEL     = "llama3-70b-8192"
+CHAT_MODEL     = "llama3-8b-8192"
 VISION_MODEL   = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 MEMORY_FILE    = "sia_memory.json"
@@ -232,6 +232,7 @@ KNOWLEDGE_BITES=[
 
 # ── Web Search ──
 def search_web(query,n=3):
+    if not DDGS: return ""
     try:
         with DDGS() as ddgs:
             results=ddgs.text(query,max_results=n)
@@ -265,12 +266,9 @@ def get_realtime_sky():
 
 # ── Battery ──
 def get_battery():
-    try:
-        if not psutil: return (None,None)
-        b=psutil.sensors_battery()
-        return (b.percent,b.power_plugged) if b else (None,None)
-    except:
-        return (None,None)
+    if not psutil: return (None,None)
+    b=psutil.sensors_battery()
+    return (b.percent,b.power_plugged) if b else (None,None)
 
 def battery_alert():
     p,plugged=get_battery()
@@ -339,6 +337,7 @@ def speak(text,voice="arvind"):
     if not sarvam_speak(text,voice): fallback_speak(text)
 
 def listen(timeout=8):
+    if not sr: return ""
     r=sr.Recognizer(); r.energy_threshold=300; r.dynamic_energy_threshold=True
     with sr.Microphone() as source:
         r.adjust_for_ambient_noise(source,duration=1)
@@ -377,70 +376,31 @@ def build_system(intents,dialect,emotion,voice_mode_val,messages,extra):
     hour=now.hour
     greet="శుభోదయం" if hour<12 else ("శుభ మధ్యాహ్నం" if hour<17 else "శుభ సాయంత్రం")
 
-    voice_instructions={
-        "grandma":"GRANDMA MODE: Speak slowly, simply, respectfully. Use అమ్మా నాయనా. No slang. No English.",
-        "genz":   "GENZ MODE: Cool Telugu+English mix! Use bro, lit, vibe, పక్కా. Short and punchy!",
-        "normal": "Normal friendly Telugu."
-    }
+    dialect_slang=""
+    if dialect in DIALECTS:
+        dialect_slang="Use: "+", ".join(DIALECTS[dialect]["slang"])
 
-    EMOTION_GUIDE={
-        "anxious":  "Calm, reassuring. Give 3 simple steps. Say ఒక్కో step చేద్దాం",
-        "sad":      "Warm and caring FIRST. Ask what happened. No advice until they feel heard.",
-        "excited":  "Match their energy! Celebrate loudly!",
-        "lazy":     "Call out lovingly in their dialect. Give 2-minute challenge.",
-        "lost":     "Give clear direction in 3 steps.",
-        "motivated":"Fuel that energy! Give specific next action NOW!",
-        "sick":     "Caring and gentle. Ask symptoms. Suggest Telugu home remedy.",
-        "lonely":   "Warm presence. Remind they are not alone.",
-        "neutral":  "Friendly and helpful."
-    }
+    voice_map={"grandma":"Speak slowly, respectfully. Use అమ్మా నాయనా.","genz":"Cool Telugu+English. Use bro, lit, vibe.","normal":"Friendly Telugu."}
 
-    predictions=predict_future(messages)
+    emotion_map={"anxious":"Be calm, give 3 steps.","sad":"Be warm first, then advise.","excited":"Match energy!","lazy":"Call out lovingly, give 2-min challenge.","lost":"Give 3 clear steps.","motivated":"Fuel the energy!","sick":"Be caring, suggest remedy.","lonely":"Warm presence.","neutral":"Helpful and friendly."}
 
-    prompt=f"""
-You are SIA — Telugu AI COMPANION. Not just a chatbot. A real companion.
-Time: {now.strftime('%I:%M %p · %A %d %B %Y')} · {greet}
+    prompt=f"""You are SIA — Telugu AI Companion. Smart, cultural, emotionally intelligent.
+Time: {now.strftime('%I:%M %p')} · {greet}
 
-IDENTITY: Exactly like Claude AI but 100% Telugu, deeply cultural, emotionally intelligent.
-Best friend + study coach + spiritual guide + life advisor.
+ALWAYS reply in Telugu only.
+Voice: {voice_map.get(voice_mode_val,'Friendly Telugu.')}
+Dialect: {dialect} — {dialect_slang}
+Emotion detected: {emotion} — {emotion_map.get(emotion,'')}
 
-VOICE MODE: {voice_instructions.get(voice_mode_val,'Normal Telugu.')}
+Be like a best friend. Max 3-4 lines. End with one clear action.
+Remember past context naturally. Predict what user needs next.
+Study coach: call out YouTube/Instagram/sleep waste lovingly.
+Cultural: know festivals, mantras, panchangam, Telugu stories.
 
-DIALECT: {dialect.upper()}
-{"Use slang: " + ", ".join(DIALECTS[dialect]["slang"]) if dialect in DIALECTS else "Clean neutral Telugu"}
+{extra[:500] if extra else ""}"""
 
-EMOTION: {emotion}
-{EMOTION_GUIDE.get(emotion,'')}
-
-COMPANION BEHAVIORS:
-1. Remember patterns: "గతసారి నువ్వు ఇలా అన్నావు..."
-2. Predict needs: "నువ్వు ఇప్పుడు అడగబోయేది..."
-3. Celebrate wins: big reactions for small victories
-4. Gentle accountability: call out time waste with love
-5. Proactive care based on time and patterns
-
-SMART MEMORY:
-{get_memory_context()}
-
-FUTURE PREDICTIONS:
-{predictions if predictions else "Keep chatting to build patterns!"}
-
-CULTURAL DEPTH: Know festivals, panchangam, nakshatra, Ramayana, Mahabharata, Gita, Annamayya, Tyagaraja.
-
-STUDY COACH: YouTube/Instagram/sleep/bore → call out in dialect → 2-min challenge → remind goal.
-
-BATTERY: {battery_alert()}
-MEDICINE: {check_medicine_reminder()}
-
-STYLE: Max 4 lines. End with ONE clear action. Be REAL. No hollow phrases.
-
-{extra}
-"""
-    if "panchangam" in intents: prompt+=f"\n\nLIVE PANCHANGAM:\n{get_panchangam()}"
-    if "sky"        in intents: prompt+=f"\n\nREALTIME SKY:\n{get_realtime_sky()}"
-    if "story"      in intents:
-        for sk,sv in STORIES.items():
-            if sk in extra.lower() or sk in " ".join(intents): prompt+=f"\n\nSTORY:\n{sv}"
+    if "panchangam" in intents: prompt+=f"\nPanchangam: {get_panchangam()[:300]}"
+    if "sky" in intents: prompt+=f"\nSky: {get_realtime_sky()[:300]}"
     return prompt
 
 # ── Chat ──
@@ -449,8 +409,8 @@ def chat(user_msg,history,extra=""):
     intents=detect_intents(user_msg); vm=detect_voice_mode(user_msg)
     log_habit(emotion,user_msg[:50],datetime.datetime.now().hour)
     system=build_system(intents,dialect,emotion,vm,history,extra)
-    messages=[{"role":"system","content":system}]+history[-14:]+[{"role":"user","content":user_msg}]
-    r=client.chat.completions.create(model=CHAT_MODEL,messages=messages,max_tokens=450,temperature=0.88)
+    messages=[{"role":"system","content":system}]+history[-6:]+[{"role":"user","content":user_msg}]
+    r=client.chat.completions.create(model=CHAT_MODEL,messages=messages,max_tokens=250,temperature=0.85)
     reply=r.choices[0].message.content
     increment_counter(dialect=dialect,emotion=emotion)
     return reply,dialect,emotion,vm
