@@ -295,7 +295,7 @@ def analyze_resume(text):
     try:
         r=client.chat.completions.create(model=CHAT_MODEL,
             messages=[{"role":"user","content":f"Analyze resume in Telugu. 3 strengths + 3 improvements:\n{text[:2000]}"}],
-            max_tokens=300)
+            max_tokens=200)
         return r.choices[0].message.content
     except: return "Resume విశ్లేషణ చేయలేకపోయాను."
 
